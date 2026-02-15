@@ -698,8 +698,10 @@ def plot_pace_comparison(pacing_data: dict, total_distance_km: float, lang: str)
     """Create pace comparison plot."""
     fig, ax = plt.subplots(figsize=(12, 4))
     km_splits = pacing_data['km_splits']
-    kms = [s['km'] for s in km_splits]
-    actual_paces = [s['actual_pace_min_km'] for s in km_splits]
+    # Only include full kilometers (exclude partial final km like 21.06)
+    full_km_splits = [s for s in km_splits if s['km'] == int(s['km'])]
+    kms = [s['km'] for s in full_km_splits]
+    actual_paces = [s['actual_pace_min_km'] for s in full_km_splits]
     gap_pace = pacing_data['target_gap_pace']
     colors = ['#E94F37' if p > gap_pace else '#2E86AB' for p in actual_paces]
     ax.bar(kms, [p * 60 for p in actual_paces], width=0.8, color=colors, alpha=0.7, label='Actual Pace')
