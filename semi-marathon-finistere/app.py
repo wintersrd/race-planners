@@ -776,6 +776,12 @@ def main():
     with st.expander(f"📖 {t('how_to_use', lang)}"):
         st.markdown(t('instructions', lang))
 
+    # Course elevation profile - always visible as reference
+    st.markdown(f"### {t('course_profile', lang)}")
+    fig_elevation = plot_elevation_profile(trackpoints, REST_STOPS, total_distance_km, lang)
+    st.pyplot(fig_elevation)
+    plt.close(fig_elevation)
+
     # Sidebar for inputs
     with st.sidebar:
         st.markdown(f"### {t('set_your_target', lang)}")
@@ -925,12 +931,6 @@ def main():
                 st.info(f"**{t('split', lang)}:** {t('even', lang)}")
 
             st.divider()
-
-            # Elevation profile
-            st.markdown(f"### {t('course_profile', lang)}")
-            fig_elevation = plot_elevation_profile(trackpoints, REST_STOPS, total_distance_km, lang)
-            st.pyplot(fig_elevation)
-            plt.close(fig_elevation)
 
             # Pace comparison
             st.markdown(f"### {t('pace_per_km', lang)}")
