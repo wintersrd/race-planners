@@ -8,6 +8,7 @@ Run with: streamlit run app.py
 import streamlit as st
 import xml.etree.ElementTree as ET
 import math
+import os
 from dataclasses import dataclass
 from typing import List, Tuple, Optional
 import numpy as np
@@ -311,7 +312,9 @@ COURSE_SECTIONS = [
 ]
 
 REST_STOPS = [5.3, 9.1, 14.5]
-GPX_FILE = 'WR-GPX-Semi-marathon-du-Finistere.gpx'
+# Use absolute path based on script location for deployment compatibility
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+GPX_FILE = os.path.join(SCRIPT_DIR, 'WR-GPX-Semi-marathon-du-Finistere.gpx')
 SMOOTHING_WINDOW = 5
 
 # =============================================================================
