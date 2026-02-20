@@ -164,6 +164,22 @@ TRANSLATIONS = {
 3. **Set rest duration** - How long you plan to stop at each water station
 4. **Click "Calculate Pacing"** - View your personalized pacing plan
 5. **Print or download** - Use the Print/Export tab for race-day reference''',
+        'elevation_segments': 'Elevation Segments',
+        'climb': 'Climb',
+        'descent': 'Descent',
+        'flat': 'Flat',
+        'segment_type': 'Type',
+        'avg_grade': 'Avg Grade',
+        'distance_km': 'Distance',
+        'total_climb_dist': 'Total Climbing',
+        'total_descent_dist': 'Total Descending',
+        'total_flat_dist': 'Total Flat',
+        'grade_threshold': 'Grade Threshold',
+        'min_segment': 'Min Segment',
+        'segment': 'Segment',
+        'elev_delta': 'Elev Δ',
+        'segment_stats': 'Segment Statistics',
+        'avg_pace_by_type': 'Average Pace by Type',
     },
     'fr': {
         'title': '🏃‍♀️ Allure Semi-Marathon',
@@ -253,6 +269,22 @@ TRANSLATIONS = {
 3. **Définissez la durée des ravitos** - Combien de temps vous prévoyez vous arrêter à chaque station
 4. **Cliquez "Calculer"** - Consultez votre plan d'allure personnalisé
 5. **Imprimez ou téléchargez** - Utilisez l'onglet Imprimer/Exporter pour votre aide-mémoire''',
+        'elevation_segments': 'Segments Altimétriques',
+        'climb': 'Montée',
+        'descent': 'Descente',
+        'flat': 'Plat',
+        'segment_type': 'Type',
+        'avg_grade': 'Pente Moy',
+        'distance_km': 'Distance',
+        'total_climb_dist': 'Total Montée',
+        'total_descent_dist': 'Total Descente',
+        'total_flat_dist': 'Total Plat',
+        'grade_threshold': 'Seuil de Pente',
+        'min_segment': 'Segment Min',
+        'segment': 'Segment',
+        'elev_delta': 'Déniv.',
+        'segment_stats': 'Statistiques des Segments',
+        'avg_pace_by_type': 'Allure Moyenne par Type',
     }
 }
 
@@ -522,6 +554,245 @@ def calculate_segment_gap_factor(trackpoints: List[TrackPoint], start_m: float, 
     return weighted_gap_mult, avg_grade, avg_elevation
 
 
+# =============================================================================
+# ELEVATION SEGMENT DETECTION FUNCTIONS
+# =============================================================================
+
+@dataclass
+class ElevationSegment:
+    """Represents a course segment classified by elevation change."""
+    segment_number: int
+    segment_type: str  # 'climb', 'descent', 'flat'
+    start_km: float
+    end_km: float
+    distance_km: float
+    avg_grade_percent: float
+    elev_gain_m: float
+    elev_loss_m: float
+    net_elev_m: float
+    gap_factor: float
+    actual_pace_min_km: float = 0.0
+    gap_pace_min_km: float = 0.0
+    segment_time_min: float = 0.0
+    cumulative_time_min: float = 0.0
+
+
+def calculate_rolling_grade(trackpoints: List[TrackPoint], window_meters: float = 500) -> List[float]:
+    """Calculate smoothed grade using a distance-based rolling window.
+
+    Args:
+        trackpoints: List of trackpoints with distance and grade data
+        window_meters: Window size in meters (default 500m)
+
+    Returns:
+        List of smoothed grade values for each trackpoint
+    """
+    if len(trackpoints) < 2:
+        return [0.0] * len(trackpoints)
+
+    rolling_grades = []
+    half_window = window_meters / 2
+
+    for i, point in enumerate(trackpoints):
+        current_dist = point.distance_from_start
+        window_start = current_dist - half_window
+        window_end = current_dist + half_window
+
+        # Collect all points within the window
+        grades_in_window = []
+        weights = []
+
+        for j, tp in enumerate(trackpoints):
+            if window_start <= tp.distance_from_start <= window_end:
+                # Weight by distance from center (closer = higher weight)
+                dist_from_center = abs(tp.distance_from_start - current_dist)
+                weight = max(0.1, 1.0 - dist_from_center / half_window)
+                grades_in_window.append(tp.grade_percent)
+                weights.append(weight)
+
+        if grades_in_window:
+            weighted_grade = sum(g * w for g, w in zip(grades_in_window, weights)) / sum(weights)
+            rolling_grades.append(weighted_grade)
+        else:
+            rolling_grades.append(point.grade_percent)
+
+    return rolling_grades
+
+
+def classify_grade(grade_percent: float, threshold: float = 2.0) -> str:
+    """Classify a grade as climb, descent, or flat.
+
+    Args:
+        grade_percent: Grade percentage
+        threshold: Threshold for climb/descent classification
+
+    Returns:
+        'climb', 'descent', or 'flat'
+    """
+    if grade_percent > threshold:
+        return 'climb'
+    elif grade_percent < -threshold:
+        return 'descent'
+    else:
+        return 'flat'
+
+
+def detect_elevation_segments(trackpoints: List[TrackPoint],
+                              min_segment_m: float = 500,
+                              grade_threshold: float = 2.0) -> List[ElevationSegment]:
+    """Detect elevation-based segments using rolling window and state machine.
+
+    Args:
+        trackpoints: List of trackpoints with distance and grade data
+        min_segment_m: Minimum segment distance in meters
+        grade_threshold: Grade threshold for climb/descent classification
+
+    Returns:
+        List of ElevationSegment objects
+    """
+    if len(trackpoints) < 2:
+        return []
+
+    # Step 1: Calculate rolling grade over 500m window
+    rolling_grades = calculate_rolling_grade(trackpoints, window_meters=500)
+
+    # Step 2: Classify each point
+    classifications = [classify_grade(g, grade_threshold) for g in rolling_grades]
+
+    # Step 3: State machine to find segment boundaries
+    raw_segments = []
+    current_type = classifications[0]
+    segment_start_idx = 0
+
+    for i, classification in enumerate(classifications):
+        if classification != current_type:
+            # Check distance from segment start
+            segment_distance = trackpoints[i].distance_from_start - trackpoints[segment_start_idx].distance_from_start
+
+            if segment_distance >= min_segment_m:
+                # Create segment
+                raw_segments.append({
+                    'start_idx': segment_start_idx,
+                    'end_idx': i,
+                    'type': current_type
+                })
+                segment_start_idx = i
+                current_type = classification
+
+    # Add final segment
+    raw_segments.append({
+        'start_idx': segment_start_idx,
+        'end_idx': len(trackpoints) - 1,
+        'type': current_type
+    })
+
+    # Step 4: Merge adjacent same-type segments and filter short segments
+    merged_segments = []
+
+    for seg in raw_segments:
+        start_km = trackpoints[seg['start_idx']].distance_from_start / 1000
+        end_km = trackpoints[seg['end_idx']].distance_from_start / 1000
+        distance_km = end_km - start_km
+
+        # Skip segments shorter than minimum (unless it's the last one)
+        if distance_km * 1000 < min_segment_m and seg != raw_segments[-1]:
+            continue
+
+        # Check if we can merge with previous segment of same type
+        if merged_segments and merged_segments[-1]['type'] == seg['type']:
+            # Extend previous segment
+            merged_segments[-1]['end_idx'] = seg['end_idx']
+            merged_segments[-1]['end_km'] = end_km
+            merged_segments[-1]['distance_km'] = merged_segments[-1]['end_km'] - merged_segments[-1]['start_km']
+        else:
+            merged_segments.append({
+                'start_idx': seg['start_idx'],
+                'end_idx': seg['end_idx'],
+                'type': seg['type'],
+                'start_km': start_km,
+                'end_km': end_km,
+                'distance_km': distance_km
+            })
+
+    # Step 5: Create ElevationSegment objects with statistics
+    elevation_segments = []
+
+    for i, seg in enumerate(merged_segments):
+        start_idx = seg['start_idx']
+        end_idx = seg['end_idx']
+
+        # Calculate segment statistics
+        start_m = trackpoints[start_idx].distance_from_start
+        end_m = trackpoints[end_idx].distance_from_start
+
+        # Calculate weighted GAP factor
+        gap_mult, avg_grade, _ = calculate_segment_gap_factor(trackpoints, start_m, end_m)
+
+        # Calculate elevation changes
+        elev_gain, elev_loss = calculate_elevation_changes(
+            trackpoints,
+            seg['start_km'],
+            seg['end_km']
+        )
+
+        elevation_segments.append(ElevationSegment(
+            segment_number=i + 1,
+            segment_type=seg['type'],
+            start_km=seg['start_km'],
+            end_km=seg['end_km'],
+            distance_km=seg['distance_km'],
+            avg_grade_percent=avg_grade,
+            elev_gain_m=elev_gain,
+            elev_loss_m=elev_loss,
+            net_elev_m=elev_gain - elev_loss,
+            gap_factor=gap_mult
+        ))
+
+    return elevation_segments
+
+
+def calculate_segment_pacing(elevation_segments: List[ElevationSegment],
+                             trackpoints: List[TrackPoint],
+                             pacing_data: dict,
+                             power_fade: float,
+                             total_distance_km: float) -> List[ElevationSegment]:
+    """Calculate pacing for each elevation segment.
+
+    Args:
+        elevation_segments: List of ElevationSegment objects
+        trackpoints: List of trackpoints
+        pacing_data: Calculated pacing data from calculate_pacing()
+        power_fade: Power fade setting
+        total_distance_km: Total course distance
+
+    Returns:
+        Updated list of ElevationSegment objects with pacing data
+    """
+    base_gap_pace = pacing_data['target_gap_pace']
+    cumulative_time = 0.0
+
+    for segment in elevation_segments:
+        # Calculate midpoint for fade calculation
+        midpoint_km = (segment.start_km + segment.end_km) / 2
+        fade_mult = get_fade_multiplier(power_fade, midpoint_km, total_distance_km)
+
+        # Calculate paces
+        gap_pace = base_gap_pace * fade_mult
+        actual_pace = gap_pace * segment.gap_factor
+
+        # Calculate segment time
+        segment_time = actual_pace * segment.distance_km
+        cumulative_time += segment_time
+
+        # Update segment
+        segment.actual_pace_min_km = actual_pace
+        segment.gap_pace_min_km = gap_pace
+        segment.segment_time_min = segment_time
+        segment.cumulative_time_min = cumulative_time
+
+    return elevation_segments
+
+
 def calculate_pacing(trackpoints: List[TrackPoint], target_finish_time_min: float,
                      rest_stops: List[float], total_distance_km: float,
                      gap_adjusted_distance_m: float, power_fade: float = 0.0,
@@ -716,6 +987,111 @@ def plot_pace_comparison(pacing_data: dict, total_distance_km: float, lang: str)
     plt.tight_layout()
     return fig
 
+
+def plot_segmented_elevation_profile(trackpoints: List[TrackPoint],
+                                      elevation_segments: List,
+                                      rest_stops: List[float],
+                                      total_distance_km: float,
+                                      lang: str) -> plt.Figure:
+    """Create elevation profile with segments colored by type.
+
+    Args:
+        trackpoints: List of trackpoints
+        elevation_segments: List of ElevationSegment objects
+        rest_stops: List of rest stop distances in km
+        total_distance_km: Total course distance
+        lang: Language code
+
+    Returns:
+        matplotlib Figure
+    """
+    fig, ax = plt.subplots(figsize=(14, 5))
+
+    # Color mapping for segment types
+    segment_colors = {
+        'climb': '#E94F37',    # Red for climbs
+        'descent': '#2E86AB',  # Blue for descents
+        'flat': '#1B998B'      # Green for flats
+    }
+
+    # Plot each segment with its color
+    for segment in elevation_segments:
+        start_m = segment.start_km * 1000
+        end_m = segment.end_km * 1000
+
+        # Get trackpoints for this segment
+        segment_points = [p for p in trackpoints
+                         if start_m <= p.distance_from_start <= end_m]
+
+        if len(segment_points) < 2:
+            continue
+
+        distances_km = [p.distance_from_start / 1000 for p in segment_points]
+        elevations = [p.elevation for p in segment_points]
+
+        color = segment_colors.get(segment.segment_type, '#888888')
+
+        # Fill the area under the curve
+        ax.fill_between(distances_km, elevations, alpha=0.4, color=color)
+        ax.plot(distances_km, elevations, color=color, linewidth=2.5)
+
+        # Add segment label at midpoint
+        mid_km = (segment.start_km + segment.end_km) / 2
+        mid_elev = sum(elevations) / len(elevations) if elevations else 0
+
+        # Get translated type
+        type_label = t(segment.segment_type, lang)
+
+        ax.annotate(
+            f'{type_label}\n{segment.distance_km:.1f}km\n{segment.avg_grade_percent:+.1f}%',
+            xy=(mid_km, mid_elev),
+            xytext=(mid_km, mid_elev + 15),
+            fontsize=8,
+            ha='center',
+            va='bottom',
+            color=color,
+            fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8, edgecolor=color)
+        )
+
+    # Add rest stop markers
+    for stop in rest_stops:
+        ax.axvline(x=stop, color='#F4A261', linestyle='--', linewidth=1.5, alpha=0.8)
+        stop_idx = min(range(len(trackpoints)),
+                      key=lambda i: abs(trackpoints[i].distance_from_start / 1000 - stop))
+        stop_elev = trackpoints[stop_idx].elevation
+        ax.annotate(f'R{rest_stops.index(stop) + 1}', xy=(stop, stop_elev),
+                   xytext=(stop, stop_elev + 25), fontsize=9, color='#F4A261',
+                   fontweight='bold', ha='center')
+
+    # Create legend for segment types
+    from matplotlib.patches import Patch
+    legend_elements = [
+        Patch(facecolor='#E94F37', alpha=0.4, edgecolor='#E94F37',
+              label=f"{t('climb', lang)} (>{2.0}%)"),
+        Patch(facecolor='#2E86AB', alpha=0.4, edgecolor='#2E86AB',
+              label=f"{t('descent', lang)} (<-2%)"),
+        Patch(facecolor='#1B998B', alpha=0.4, edgecolor='#1B998B',
+              label=f"{t('flat', lang)} (-2% to +2%)"),
+    ]
+    ax.legend(handles=legend_elements, loc='upper right', fontsize=10)
+
+    ax.set_xlabel(t('km', lang).upper(), fontsize=12)
+    ax.set_ylabel(f'{t("elevation", lang)} (m)', fontsize=12)
+    ax.set_title(f"{t('elevation_segments', lang)} - {t('course_profile', lang)}",
+                fontsize=14, fontweight='bold')
+    ax.set_xlim(0, total_distance_km + 0.5)
+
+    # Get elevation range for y-axis
+    all_elevations = [p.elevation for p in trackpoints]
+    min_elev = min(all_elevations)
+    max_elev = max(all_elevations)
+    ax.set_ylim(min_elev - 10, max_elev + 40)
+
+    plt.tight_layout()
+    return fig
+
+
 # =============================================================================
 # HELPER FUNCTIONS FOR DISPLAY
 # =============================================================================
@@ -812,6 +1188,20 @@ def main():
         )
         st.caption(f"💡 {t('seconds_per_stop', lang)} ({t('no_stops', lang)} = 0)")
 
+        # Elevation segment parameters
+        st.divider()
+        st.markdown(f"#### {t('elevation_segments', lang)}")
+        grade_threshold = st.slider(
+            f"{t('grade_threshold', lang)} (%)",
+            min_value=1.0, max_value=5.0, value=2.0, step=0.5,
+            help=f"Higher = fewer, more significant segments. Lower = more granular."
+        )
+        min_segment_distance = st.slider(
+            f"{t('min_segment', lang)} (m)",
+            min_value=200, max_value=1000, value=500, step=100,
+            help=f"Minimum distance for a segment. Smaller = more segments."
+        )
+
         calculate_button = st.button(f"🏃 {t('calculate', lang)}", type="primary", width='stretch')
 
     # Main content area
@@ -843,10 +1233,30 @@ def main():
         pacing_data = st.session_state['pacing_data']
         target_time_min = st.session_state.get('target_time_min', 105)
 
+        # Detect elevation segments
+        elevation_segments = detect_elevation_segments(
+            trackpoints,
+            min_segment_m=min_segment_distance,
+            grade_threshold=grade_threshold
+        )
+
+        # Calculate pacing for each segment
+        elevation_segments = calculate_segment_pacing(
+            elevation_segments,
+            trackpoints,
+            pacing_data,
+            power_fade,
+            total_distance_km
+        )
+
+        # Store in session state for access
+        st.session_state['elevation_segments'] = elevation_segments
+
         # Create tabs
-        tab1, tab2, tab3, tab4 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
             f"{t('summary', lang)}",
             f"{t('course_sections', lang)}",
+            f"{t('elevation_segments', lang)}",
             f"{t('tables', lang)}",
             f"{t('print_export', lang)}"
         ])
@@ -976,8 +1386,85 @@ def main():
                     st.markdown(f"**{t('strategy', lang)}:** {strategy}")
                     st.info(f"💡 **{t('pacing_tip', lang)}:** {pacing_tip}")
 
-        # ==================== TAB 3: TABLES ====================
+        # ==================== TAB 3: ELEVATION SEGMENTS ====================
         with tab3:
+            st.markdown(f"### {t('elevation_segments', lang)}")
+
+            # Segmented elevation profile chart
+            fig_segmented = plot_segmented_elevation_profile(
+                trackpoints, elevation_segments, REST_STOPS, total_distance_km, lang
+            )
+            st.pyplot(fig_segmented)
+            plt.close(fig_segmented)
+
+            st.divider()
+
+            # Elevation segments table
+            st.markdown(f"### {t('segment_stats', lang)}")
+
+            segment_data = []
+            for segment in elevation_segments:
+                type_translated = t(segment.segment_type, lang)
+                segment_data.append({
+                    t('segment', lang): segment.segment_number,
+                    t('segment_type', lang): type_translated,
+                    t('distance_km', lang): f"{segment.start_km:.1f} - {segment.end_km:.1f} ({segment.distance_km:.1f}km)",
+                    t('avg_grade', lang): f"{segment.avg_grade_percent:+.1f}%",
+                    t('elev_delta', lang): f"+{segment.elev_gain_m:.0f}/-{segment.elev_loss_m:.0f}",
+                    t('actual', lang): f"{format_time(segment.actual_pace_min_km)}/km",
+                    'GAP': f"{format_time(segment.gap_pace_min_km)}/km",
+                    t('time', lang): format_time(segment.segment_time_min),
+                })
+
+            df_segments = pd.DataFrame(segment_data)
+            st.dataframe(df_segments, width='stretch', hide_index=True)
+
+            st.divider()
+
+            # Summary statistics by segment type
+            st.markdown(f"### {t('avg_pace_by_type', lang)}")
+
+            # Calculate totals by type
+            type_stats = {'climb': {'dist': 0, 'time': 0}, 'descent': {'dist': 0, 'time': 0}, 'flat': {'dist': 0, 'time': 0}}
+
+            for segment in elevation_segments:
+                type_stats[segment.segment_type]['dist'] += segment.distance_km
+                type_stats[segment.segment_type]['time'] += segment.segment_time_min
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                climb_dist = type_stats['climb']['dist']
+                climb_time = type_stats['climb']['time']
+                climb_pace = climb_time / climb_dist if climb_dist > 0 else 0
+                st.metric(
+                    f"⛰️ {t('total_climb_dist', lang)}",
+                    f"{climb_dist:.1f} km",
+                    f"{format_time(climb_pace)}/km" if climb_dist > 0 else "-"
+                )
+
+            with col2:
+                descent_dist = type_stats['descent']['dist']
+                descent_time = type_stats['descent']['time']
+                descent_pace = descent_time / descent_dist if descent_dist > 0 else 0
+                st.metric(
+                    f"📉 {t('total_descent_dist', lang)}",
+                    f"{descent_dist:.1f} km",
+                    f"{format_time(descent_pace)}/km" if descent_dist > 0 else "-"
+                )
+
+            with col3:
+                flat_dist = type_stats['flat']['dist']
+                flat_time = type_stats['flat']['time']
+                flat_pace = flat_time / flat_dist if flat_dist > 0 else 0
+                st.metric(
+                    f"➡️ {t('total_flat_dist', lang)}",
+                    f"{flat_dist:.1f} km",
+                    f"{format_time(flat_pace)}/km" if flat_dist > 0 else "-"
+                )
+
+        # ==================== TAB 4: TABLES ====================
+        with tab4:
             # Rest stops table
             st.markdown(f"### {t('rest_stop_arrival', lang)}")
 
@@ -1038,8 +1525,8 @@ def main():
             df_splits = pd.DataFrame(splits_data)
             st.dataframe(df_splits, width='stretch', hide_index=True)
 
-        # ==================== TAB 4: PRINT/EXPORT ====================
-        with tab4:
+        # ==================== TAB 5: PRINT/EXPORT ====================
+        with tab5:
             st.markdown(f"### {t('quick_ref', lang)}")
 
             col_left, col_right = st.columns(2)
