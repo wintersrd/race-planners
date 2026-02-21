@@ -5,15 +5,16 @@ Streamlit version of the Jupyter notebook race planner
 Run with: streamlit run app.py
 """
 
-import streamlit as st
-import xml.etree.ElementTree as ET
 import math
 import os
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
-import numpy as np
+from typing import List, Optional, Tuple
+
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import streamlit as st
 
 # =============================================================================
 # PAGE CONFIG
@@ -22,13 +23,14 @@ st.set_page_config(
     page_title="Half Marathon Race Pacing",
     page_icon="🏃‍♀️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # =============================================================================
 # CUSTOM CSS FOR TABS
 # =============================================================================
-st.markdown("""
+st.markdown(
+    """
 <style>
     /* Make tab headers larger and more pronounced */
     .stTabs [data-baseweb="tab-list"] {
@@ -69,228 +71,232 @@ st.markdown("""
         border-radius: 0px 0px 10px 10px;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # =============================================================================
 # TRANSLATIONS DICTIONARY - English/French
 # =============================================================================
 
 TRANSLATIONS = {
-    'en': {
-        'title': '🏃‍♀️ Half Marathon Race Pacing',
-        'subtitle': 'Semi-Marathon du Finistère',
-        'course': 'Course',
-        'rest_stops_at': 'Rest stops at',
-        'set_your_target': '🎯 Set Your Target',
-        'target_finish_time': 'Target Finish Time',
-        'target_avg_pace': 'Target Average Pace',
-        'finish_time': 'Finish Time:',
-        'pace': 'Pace:',
-        'power_fade': 'Power Fade:',
-        'rest_duration': 'Rest Duration:',
-        'calculate': 'Calculate Pacing',
-        'elapsed': 'Elapsed',
-        'split_time': 'Split Time',
-        'actual': 'Actual',
-        'elev_change': 'Elev Δ',
-        'rest': 'Rest',
-        'finish': 'Finish',
-        'km': 'km',
-        'grade': 'Grade',
-        'total': 'Total',
-        'strategy_even': 'EVEN PACING',
-        'strategy_positive': 'POSITIVE SPLIT',
-        'strategy_negative': 'NEGATIVE SPLIT',
-        'running_time': 'Running time',
-        'rest_time': 'Rest time',
-        'total_time': 'Total time',
-        'avg_pace': 'Avg pace',
-        'gap_pace': 'GAP pace',
-        'split_analysis': 'Split Analysis',
-        'first_half': '1st half',
-        'second_half': '2nd half',
-        'elevation': 'Elevation',
-        'uphill_kms': 'Uphill kms',
-        'downhill_kms': 'Downhill kms',
-        'split': 'Split',
-        'slower_2nd': 'slower 2nd half',
-        'faster_2nd': 'faster 2nd half',
-        'even': 'Even',
-        'rest_stop_arrival': '🚰 Rest Stop Arrival Times',
-        'km_splits': '📊 Kilometer Splits',
-        'course_profile': 'Course Elevation Profile',
-        'pace_per_km': 'Pace per Kilometer',
-        'range': 'Range',
-        'uphill': 'uphill (slower)',
-        'downhill': 'downhill (faster)',
-        'faster_start': 'faster start',
-        'slower_finish': 'slower finish',
-        'slower_start': 'slower start',
-        'faster_finish': 'faster finish',
-        'seconds_per_stop': 'Seconds per rest stop',
-        'no_stops': 'no stops',
-        'quick_ref': '📋 Quick Reference',
-        'level': 'Level',
-        'elite': 'Elite',
-        'advanced': 'Advanced',
-        'competitive': 'Competitive',
-        'strong': 'Strong',
-        'intermediate': 'Intermediate',
-        'recreational': 'Recreational',
-        'target': 'TARGET',
-        'strategy': 'Strategy',
-        'pace_adjustment': 'Pace adjustment',
-        'stops': 'stops',
-        'print_pocket': '🖨️ Pocket Card',
-        'print_wrist': '🖨️ Wrist Band',
-        'course_sections': '📍 Course Sections',
-        'section': 'Section',
-        'distance': 'Distance',
-        'time': 'Time',
-        'elev': 'Elev',
-        'negative_faster_finish': 'Negative = stronger finish',
-        'positive_faster_start': 'Positive = faster start',
-        'zero_even_pace': '0 = even pace',
-        'input_mode': 'Input Mode:',
-        'pacing_tip': 'Pacing Tip',
-        'summary': '📊 Summary',
-        'tables': '📋 Tables',
-        'print_export': '🖨️ Print/Export',
-        'download_pocket': 'Download Pocket Card',
-        'download_wrist': 'Download Wrist Band',
-        'how_to_use': 'How to Use',
-        'instructions': '''1. **Set your target** - Enter your goal finish time or target pace
+    "en": {
+        "title": "🏃‍♀️ Half Marathon Race Pacing",
+        "subtitle": "Semi-Marathon du Finistère",
+        "course": "Course",
+        "rest_stops_at": "Rest stops at",
+        "set_your_target": "🎯 Set Your Target",
+        "target_finish_time": "Target Finish Time",
+        "target_avg_pace": "Target Average Pace",
+        "finish_time": "Finish Time:",
+        "pace": "Pace:",
+        "power_fade": "Power Fade:",
+        "rest_duration": "Rest Duration:",
+        "calculate": "Calculate Pacing",
+        "elapsed": "Elapsed",
+        "split_time": "Split Time",
+        "actual": "Actual",
+        "elev_change": "Elev Δ",
+        "rest": "Rest",
+        "finish": "Finish",
+        "km": "km",
+        "grade": "Grade",
+        "total": "Total",
+        "strategy_even": "EVEN PACING",
+        "strategy_positive": "POSITIVE SPLIT",
+        "strategy_negative": "NEGATIVE SPLIT",
+        "running_time": "Running time",
+        "rest_time": "Rest time",
+        "total_time": "Total time",
+        "avg_pace": "Avg pace",
+        "gap_pace": "GAP pace",
+        "split_analysis": "Split Analysis",
+        "first_half": "1st half",
+        "second_half": "2nd half",
+        "elevation": "Elevation",
+        "uphill_kms": "Uphill kms",
+        "downhill_kms": "Downhill kms",
+        "split": "Split",
+        "slower_2nd": "slower 2nd half",
+        "faster_2nd": "faster 2nd half",
+        "even": "Even",
+        "rest_stop_arrival": "🚰 Rest Stop Arrival Times",
+        "km_splits": "📊 Kilometer Splits",
+        "course_profile": "Course Elevation Profile",
+        "pace_per_km": "Pace per Kilometer",
+        "range": "Range",
+        "uphill": "uphill (slower)",
+        "downhill": "downhill (faster)",
+        "faster_start": "faster start",
+        "slower_finish": "slower finish",
+        "slower_start": "slower start",
+        "faster_finish": "faster finish",
+        "seconds_per_stop": "Seconds per rest stop",
+        "no_stops": "no stops",
+        "quick_ref": "📋 Quick Reference",
+        "level": "Level",
+        "elite": "Elite",
+        "advanced": "Advanced",
+        "competitive": "Competitive",
+        "strong": "Strong",
+        "intermediate": "Intermediate",
+        "recreational": "Recreational",
+        "target": "TARGET",
+        "strategy": "Strategy",
+        "pace_adjustment": "Pace adjustment",
+        "stops": "stops",
+        "print_pocket": "🖨️ Pocket Card",
+        "print_wrist": "🖨️ Wrist Band",
+        "course_sections": "📍 Course Sections",
+        "section": "Section",
+        "distance": "Distance",
+        "time": "Time",
+        "elev": "Elev",
+        "negative_faster_finish": "Negative = stronger finish",
+        "positive_faster_start": "Positive = faster start",
+        "zero_even_pace": "0 = even pace",
+        "input_mode": "Input Mode:",
+        "pacing_tip": "Pacing Tip",
+        "summary": "📊 Summary",
+        "tables": "📋 Tables",
+        "print_export": "🖨️ Print/Export",
+        "download_pocket": "Download Pocket Card",
+        "download_wrist": "Download Wrist Band",
+        "how_to_use": "How to Use",
+        "instructions": """1. **Set your target** - Enter your goal finish time or target pace
 2. **Adjust power fade** - Use negative values for a stronger finish, positive for a faster start
 3. **Set rest duration** - How long you plan to stop at each water station
 4. **Click "Calculate Pacing"** - View your personalized pacing plan
-5. **Print or download** - Use the Print/Export tab for race-day reference''',
-        'elevation_segments': 'Elevation Segments',
-        'climb': 'Climb',
-        'descent': 'Descent',
-        'flat': 'Flat',
-        'segment_type': 'Type',
-        'avg_grade': 'Avg Grade',
-        'distance_km': 'Distance',
-        'total_climb_dist': 'Total Climbing',
-        'total_descent_dist': 'Total Descending',
-        'total_flat_dist': 'Total Flat',
-        'grade_threshold': 'Grade Threshold',
-        'min_segment': 'Min Segment',
-        'segment': 'Segment',
-        'elev_delta': 'Elev Δ',
-        'segment_stats': 'Segment Statistics',
-        'avg_pace_by_type': 'Average Pace by Type',
+5. **Print or download** - Use the Print/Export tab for race-day reference""",
+        "elevation_segments": "Elevation Segments",
+        "climb": "Climb",
+        "descent": "Descent",
+        "flat": "Flat",
+        "segment_type": "Type",
+        "avg_grade": "Avg Grade",
+        "distance_km": "Distance",
+        "total_climb_dist": "Total Climbing",
+        "total_descent_dist": "Total Descending",
+        "total_flat_dist": "Total Flat",
+        "grade_threshold": "Grade Threshold",
+        "min_segment": "Min Segment",
+        "segment": "Segment",
+        "elev_delta": "Elev Δ",
+        "segment_stats": "Segment Statistics",
+        "avg_pace_by_type": "Average Pace by Type",
     },
-    'fr': {
-        'title': '🏃‍♀️ Allure Semi-Marathon',
-        'subtitle': 'Semi-Marathon du Finistère',
-        'course': 'Parcours',
-        'rest_stops_at': 'Ravitaillements à',
-        'set_your_target': '🎯 Définissez votre objectif',
-        'target_finish_time': 'Temps cible',
-        'target_avg_pace': 'Allure moyenne cible',
-        'finish_time': 'Temps:',
-        'pace': 'Allure:',
-        'power_fade': 'Gestion effort:',
-        'rest_duration': 'Durée ravito:',
-        'calculate': 'Calculer',
-        'elapsed': 'Cumul',
-        'split_time': 'Intervalle',
-        'actual': 'Réelle',
-        'elev_change': 'Déniv.',
-        'rest': 'Ravito',
-        'finish': 'Arrivée',
-        'km': 'km',
-        'grade': 'Pente',
-        'total': 'Total',
-        'strategy_even': 'ALLURE CONSTANTE',
-        'strategy_positive': 'SPLIT POSITIF',
-        'strategy_negative': 'SPLIT NÉGATIF',
-        'running_time': 'Temps de course',
-        'rest_time': 'Temps ravito',
-        'total_time': 'Temps total',
-        'avg_pace': 'Allure moy',
-        'gap_pace': 'Allure GAP',
-        'split_analysis': 'Analyse des splits',
-        'first_half': '1ère moitié',
-        'second_half': '2ème moitié',
-        'elevation': 'Dénivelé',
-        'uphill_kms': 'kms montée',
-        'downhill_kms': 'kms descente',
-        'split': 'Split',
-        'slower_2nd': '2ème moitié plus lente',
-        'faster_2nd': '2ème moitié plus rapide',
-        'even': 'Égal',
-        'rest_stop_arrival': '🚰 Temps aux Ravitaillements',
-        'km_splits': '📊 Splits par Kilomètre',
-        'course_profile': 'Profil Altimétrique',
-        'pace_per_km': 'Allure par Kilomètre',
-        'range': 'Plage',
-        'uphill': 'montée (plus lent)',
-        'downhill': 'descente (plus rapide)',
-        'faster_start': 'départ rapide',
-        'slower_finish': 'fin plus lente',
-        'slower_start': 'départ lent',
-        'faster_finish': 'fin plus rapide',
-        'seconds_per_stop': 'Secondes par ravitaillement',
-        'no_stops': 'sans arrêt',
-        'quick_ref': '📋 Référence Rapide',
-        'level': 'Niveau',
-        'elite': 'Élite',
-        'advanced': 'Avancé',
-        'competitive': 'Compétitif',
-        'strong': 'Confirmé',
-        'intermediate': 'Intermédiaire',
-        'recreational': 'Loisir',
-        'target': 'OBJECTIF',
-        'strategy': 'Stratégie',
-        'pace_adjustment': 'Ajustement allure',
-        'stops': 'arrêts',
-        'print_pocket': '🖨️ Carte Poche',
-        'print_wrist': '🖨️ Brassard',
-        'course_sections': '📍 Sections du Parcours',
-        'section': 'Section',
-        'distance': 'Distance',
-        'time': 'Temps',
-        'elev': 'Déniv.',
-        'negative_faster_finish': 'Négatif = fin plus rapide',
-        'positive_faster_start': 'Positif = départ rapide',
-        'zero_even_pace': '0 = allure constante',
-        'input_mode': 'Mode saisie:',
-        'pacing_tip': "Conseil d'Allure",
-        'summary': '📊 Résumé',
-        'tables': '📋 Tableaux',
-        'print_export': '🖨️ Imprimer/Exporter',
-        'download_pocket': 'Télécharger Carte Poche',
-        'download_wrist': 'Télécharger Brassard',
-        'how_to_use': 'Comment Utiliser',
-        'instructions': '''1. **Définissez votre objectif** - Entrez votre temps cible ou allure cible
+    "fr": {
+        "title": "🏃‍♀️ Allure Semi-Marathon",
+        "subtitle": "Semi-Marathon du Finistère",
+        "course": "Parcours",
+        "rest_stops_at": "Ravitaillements à",
+        "set_your_target": "🎯 Définissez votre objectif",
+        "target_finish_time": "Temps cible",
+        "target_avg_pace": "Allure moyenne cible",
+        "finish_time": "Temps:",
+        "pace": "Allure:",
+        "power_fade": "Gestion effort:",
+        "rest_duration": "Durée ravito:",
+        "calculate": "Calculer",
+        "elapsed": "Cumul",
+        "split_time": "Intervalle",
+        "actual": "Réelle",
+        "elev_change": "Déniv.",
+        "rest": "Ravito",
+        "finish": "Arrivée",
+        "km": "km",
+        "grade": "Pente",
+        "total": "Total",
+        "strategy_even": "ALLURE CONSTANTE",
+        "strategy_positive": "SPLIT POSITIF",
+        "strategy_negative": "SPLIT NÉGATIF",
+        "running_time": "Temps de course",
+        "rest_time": "Temps ravito",
+        "total_time": "Temps total",
+        "avg_pace": "Allure moy",
+        "gap_pace": "Allure GAP",
+        "split_analysis": "Analyse des splits",
+        "first_half": "1ère moitié",
+        "second_half": "2ème moitié",
+        "elevation": "Dénivelé",
+        "uphill_kms": "kms montée",
+        "downhill_kms": "kms descente",
+        "split": "Split",
+        "slower_2nd": "2ème moitié plus lente",
+        "faster_2nd": "2ème moitié plus rapide",
+        "even": "Égal",
+        "rest_stop_arrival": "🚰 Temps aux Ravitaillements",
+        "km_splits": "📊 Splits par Kilomètre",
+        "course_profile": "Profil Altimétrique",
+        "pace_per_km": "Allure par Kilomètre",
+        "range": "Plage",
+        "uphill": "montée (plus lent)",
+        "downhill": "descente (plus rapide)",
+        "faster_start": "départ rapide",
+        "slower_finish": "fin plus lente",
+        "slower_start": "départ lent",
+        "faster_finish": "fin plus rapide",
+        "seconds_per_stop": "Secondes par ravitaillement",
+        "no_stops": "sans arrêt",
+        "quick_ref": "📋 Référence Rapide",
+        "level": "Niveau",
+        "elite": "Élite",
+        "advanced": "Avancé",
+        "competitive": "Compétitif",
+        "strong": "Confirmé",
+        "intermediate": "Intermédiaire",
+        "recreational": "Loisir",
+        "target": "OBJECTIF",
+        "strategy": "Stratégie",
+        "pace_adjustment": "Ajustement allure",
+        "stops": "arrêts",
+        "print_pocket": "🖨️ Carte Poche",
+        "print_wrist": "🖨️ Brassard",
+        "course_sections": "📍 Sections du Parcours",
+        "section": "Section",
+        "distance": "Distance",
+        "time": "Temps",
+        "elev": "Déniv.",
+        "negative_faster_finish": "Négatif = fin plus rapide",
+        "positive_faster_start": "Positif = départ rapide",
+        "zero_even_pace": "0 = allure constante",
+        "input_mode": "Mode saisie:",
+        "pacing_tip": "Conseil d'Allure",
+        "summary": "📊 Résumé",
+        "tables": "📋 Tableaux",
+        "print_export": "🖨️ Imprimer/Exporter",
+        "download_pocket": "Télécharger Carte Poche",
+        "download_wrist": "Télécharger Brassard",
+        "how_to_use": "Comment Utiliser",
+        "instructions": """1. **Définissez votre objectif** - Entrez votre temps cible ou allure cible
 2. **Ajustez la gestion d'effort** - Valeurs négatives pour une fin plus forte, positives pour un départ rapide
 3. **Définissez la durée des ravitos** - Combien de temps vous prévoyez vous arrêter à chaque station
 4. **Cliquez "Calculer"** - Consultez votre plan d'allure personnalisé
-5. **Imprimez ou téléchargez** - Utilisez l'onglet Imprimer/Exporter pour votre aide-mémoire''',
-        'elevation_segments': 'Segments Altimétriques',
-        'climb': 'Montée',
-        'descent': 'Descente',
-        'flat': 'Plat',
-        'segment_type': 'Type',
-        'avg_grade': 'Pente Moy',
-        'distance_km': 'Distance',
-        'total_climb_dist': 'Total Montée',
-        'total_descent_dist': 'Total Descente',
-        'total_flat_dist': 'Total Plat',
-        'grade_threshold': 'Seuil de Pente',
-        'min_segment': 'Segment Min',
-        'segment': 'Segment',
-        'elev_delta': 'Déniv.',
-        'segment_stats': 'Statistiques des Segments',
-        'avg_pace_by_type': 'Allure Moyenne par Type',
-    }
+5. **Imprimez ou téléchargez** - Utilisez l'onglet Imprimer/Exporter pour votre aide-mémoire""",
+        "elevation_segments": "Segments Altimétriques",
+        "climb": "Montée",
+        "descent": "Descente",
+        "flat": "Plat",
+        "segment_type": "Type",
+        "avg_grade": "Pente Moy",
+        "distance_km": "Distance",
+        "total_climb_dist": "Total Montée",
+        "total_descent_dist": "Total Descente",
+        "total_flat_dist": "Total Plat",
+        "grade_threshold": "Seuil de Pente",
+        "min_segment": "Segment Min",
+        "segment": "Segment",
+        "elev_delta": "Déniv.",
+        "segment_stats": "Statistiques des Segments",
+        "avg_pace_by_type": "Allure Moyenne par Type",
+    },
 }
+
 
 def t(key: str, lang: str) -> str:
     """Get translated string for the specified language."""
     return TRANSLATIONS.get(lang, {}).get(key, key)
+
 
 # =============================================================================
 # COURSE SECTIONS - Based on actual GPX elevation analysis
@@ -298,60 +304,61 @@ def t(key: str, lang: str) -> str:
 
 COURSE_SECTIONS = [
     {
-        'start_km': 0,
-        'end_km': 5.3,
-        'name_en': 'The Opening Climb',
-        'name_fr': "L'Ascension d'Ouverture",
-        'strategy_en': 'Main climb (0-3km +55m), then recover on descent to rest stop',
-        'strategy_fr': 'Montée principale (0-3km +55m), récupérez dans la descente',
-        'pacing_en': "DON'T BANK TIME HERE. Accept slower pace on the climb (your GAP will be on target). Let the descent come naturally - don't sprint it. Arrive at rest 1 feeling controlled, not spent.",
-        'pacing_fr': "NE CHERCHEZ PAS À GAGNER DU TEMPS ICI. Acceptez un rythme plus lent dans la montée (votre GAP sera bon). Laissez la descente venir naturellement. Arrivez au ravito 1 maîtrisé, pas épuisé.",
-        'icon': '⛰️'
+        "start_km": 0,
+        "end_km": 5.3,
+        "name_en": "The Opening Climb",
+        "name_fr": "L'Ascension d'Ouverture",
+        "strategy_en": "Main climb (0-3km +55m), then recover on descent to rest stop",
+        "strategy_fr": "Montée principale (0-3km +55m), récupérez dans la descente",
+        "pacing_en": "DON'T BANK TIME HERE. Accept slower pace on the climb (your GAP will be on target). Let the descent come naturally - don't sprint it. Arrive at rest 1 feeling controlled, not spent.",
+        "pacing_fr": "NE CHERCHEZ PAS À GAGNER DU TEMPS ICI. Acceptez un rythme plus lent dans la montée (votre GAP sera bon). Laissez la descente venir naturellement. Arrivez au ravito 1 maîtrisé, pas épuisé.",
+        "icon": "⛰️",
     },
     {
-        'start_km': 5.3,
-        'end_km': 9.1,
-        'name_en': 'The Rolling Ascent',
-        'name_fr': "L'Ascension Roulante",
-        'strategy_en': 'Steady climb with variation (+39m gain), conserve energy',
-        'strategy_fr': 'Montée régulière avec variations (+39m), économisez',
-        'pacing_en': "This is THE CRITICAL SECTION. You'll be tempted to push after rest 1, but there's still 16km to go. Keep effort steady on the rollers. If you can't talk comfortably here, you're going too hard.",
-        'pacing_fr': "C'est LA SECTION CRITIQUE. Vous serez tenté d'accélérer après le ravito 1, mais il reste 16km. Gardez un effort constant. Si vous ne pouvez pas parler confortablement, vous allez trop vite.",
-        'icon': '📈'
+        "start_km": 5.3,
+        "end_km": 9.1,
+        "name_en": "The Rolling Ascent",
+        "name_fr": "L'Ascension Roulante",
+        "strategy_en": "Steady climb with variation (+39m gain), conserve energy",
+        "strategy_fr": "Montée régulière avec variations (+39m), économisez",
+        "pacing_en": "This is THE CRITICAL SECTION. You'll be tempted to push after rest 1, but there's still 16km to go. Keep effort steady on the rollers. If you can't talk comfortably here, you're going too hard.",
+        "pacing_fr": "C'est LA SECTION CRITIQUE. Vous serez tenté d'accélérer après le ravito 1, mais il reste 16km. Gardez un effort constant. Si vous ne pouvez pas parler confortablement, vous allez trop vite.",
+        "icon": "📈",
     },
     {
-        'start_km': 9.1,
-        'end_km': 14.5,
-        'name_en': 'The Big Drop & Climb',
-        'name_fr': 'La Grande Descente et Montée',
-        'strategy_en': 'Enjoy the big descent (-52m), then start the second climb to rest',
-        'strategy_fr': 'Profitez de la grande descente (-52m), puis attaquez la seconde montée',
-        'pacing_en': "Use the big descent for FREE SPEED but stay RELAXED - don't burn matches. When the climb starts at ~12.5km, dig in mentally. Rest stop 3 at 14.5km is MID-CLIMB - don't stop too long or you'll get cold legs.",
-        'pacing_fr': "Profitez de la grande descente pour de la VITESSE GRATUITE mais restez DÉTENDU. Quand la montée commence vers 12.5km, accrochez-vous mentalement. Le ravito 3 à 14.5km est EN PLEINE MONTÉE - pas de pause trop longue.",
-        'icon': '📉'
+        "start_km": 9.1,
+        "end_km": 14.5,
+        "name_en": "The Big Drop & Climb",
+        "name_fr": "La Grande Descente et Montée",
+        "strategy_en": "Enjoy the big descent (-52m), then start the second climb to rest",
+        "strategy_fr": "Profitez de la grande descente (-52m), puis attaquez la seconde montée",
+        "pacing_en": "Use the big descent for FREE SPEED but stay RELAXED - don't burn matches. When the climb starts at ~12.5km, dig in mentally. Rest stop 3 at 14.5km is MID-CLIMB - don't stop too long or you'll get cold legs.",
+        "pacing_fr": "Profitez de la grande descente pour de la VITESSE GRATUITE mais restez DÉTENDU. Quand la montée commence vers 12.5km, accrochez-vous mentalement. Le ravito 3 à 14.5km est EN PLEINE MONTÉE - pas de pause trop longue.",
+        "icon": "📉",
     },
     {
-        'start_km': 14.5,
-        'end_km': 21.1,
-        'name_en': 'The Final Push',
-        'name_fr': 'La Poussée Finale',
-        'strategy_en': 'Finish the climb, then descend (-39m) and sprint to the finish',
-        'strategy_fr': 'Terminez la montée, descendez (-39m) et sprintez vers l\'arrivée',
-        'pacing_en': "You're past the worst! Finish the remaining ~2km of climb, then GRAVITY IS YOUR FRIEND on the -39m descent. Open up the stride. Last 2km is flat/rolling - leave everything on the course. This is what you trained for!",
-        'pacing_fr': "Le pire est passé! Finissez les ~2km de montée restants, puis la GRAVITÉ EST VOTRE AMIE dans la descente de -39m. Ouvrez la foulée. Les derniers 2km sont plats - donnez tout. C'est pour ça que vous vous êtes entraîné!",
-        'icon': '🏁'
-    }
+        "start_km": 14.5,
+        "end_km": 21.1,
+        "name_en": "The Final Push",
+        "name_fr": "La Poussée Finale",
+        "strategy_en": "Finish the climb, then descend (-39m) and sprint to the finish",
+        "strategy_fr": "Terminez la montée, descendez (-39m) et sprintez vers l'arrivée",
+        "pacing_en": "You're past the worst! Finish the remaining ~2km of climb, then GRAVITY IS YOUR FRIEND on the -39m descent. Open up the stride. Last 2km is flat/rolling - leave everything on the course. This is what you trained for!",
+        "pacing_fr": "Le pire est passé! Finissez les ~2km de montée restants, puis la GRAVITÉ EST VOTRE AMIE dans la descente de -39m. Ouvrez la foulée. Les derniers 2km sont plats - donnez tout. C'est pour ça que vous vous êtes entraîné!",
+        "icon": "🏁",
+    },
 ]
 
 REST_STOPS = [5.3, 9.1, 14.5]
 # Use absolute path based on script location for deployment compatibility
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-GPX_FILE = os.path.join(SCRIPT_DIR, 'semi-marathon-du-finistere.gpx')
+GPX_FILE = os.path.join(SCRIPT_DIR, "semi-marathon-du-finistere.gpx")
 SMOOTHING_WINDOW = 5
 
 # =============================================================================
 # DATA CLASSES AND CORE FUNCTIONS
 # =============================================================================
+
 
 @dataclass
 class TrackPoint:
@@ -370,7 +377,10 @@ def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     phi2 = math.radians(lat2)
     delta_phi = math.radians(lat2 - lat1)
     delta_lambda = math.radians(lon2 - lon1)
-    a = math.sin(delta_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    a = (
+        math.sin(delta_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
@@ -379,27 +389,35 @@ def parse_gpx(filepath: str) -> List[TrackPoint]:
     """Parse GPX file and return list of TrackPoints."""
     tree = ET.parse(filepath)
     root = tree.getroot()
-    ns = {'gpx': 'http://www.topografix.com/GPX/1/1'}
+    ns = {"gpx": "http://www.topografix.com/GPX/1/1"}
     trackpoints = []
     cumulative_distance = 0.0
     prev_point = None
-    for trkpt in root.findall('.//gpx:trkpt', ns):
-        lat = float(trkpt.get('lat'))
-        lon = float(trkpt.get('lon'))
-        ele_elem = trkpt.find('gpx:ele', ns)
+    for trkpt in root.findall(".//gpx:trkpt", ns):
+        lat = float(trkpt.get("lat"))
+        lon = float(trkpt.get("lon"))
+        ele_elem = trkpt.find("gpx:ele", ns)
         elevation = float(ele_elem.text) if ele_elem is not None else 0.0
-        time_elem = trkpt.find('gpx:time', ns)
-        time = time_elem.text if time_elem is not None else ''
+        time_elem = trkpt.find("gpx:time", ns)
+        time = time_elem.text if time_elem is not None else ""
         if prev_point is not None:
             distance = haversine(prev_point.lat, prev_point.lon, lat, lon)
             cumulative_distance += distance
-        point = TrackPoint(lat=lat, lon=lon, elevation=elevation, time=time, distance_from_start=cumulative_distance)
+        point = TrackPoint(
+            lat=lat,
+            lon=lon,
+            elevation=elevation,
+            time=time,
+            distance_from_start=cumulative_distance,
+        )
         trackpoints.append(point)
         prev_point = point
     return trackpoints
 
 
-def smooth_elevation(trackpoints: List[TrackPoint], window_size: int = 3) -> List[TrackPoint]:
+def smooth_elevation(
+    trackpoints: List[TrackPoint], window_size: int = 3
+) -> List[TrackPoint]:
     """Smooth elevation data using moving average."""
     if len(trackpoints) < window_size:
         return trackpoints
@@ -408,19 +426,31 @@ def smooth_elevation(trackpoints: List[TrackPoint], window_size: int = 3) -> Lis
     for i, point in enumerate(trackpoints):
         start_idx = max(0, i - half_window)
         end_idx = min(len(trackpoints), i + half_window + 1)
-        avg_elevation = sum(trackpoints[j].elevation for j in range(start_idx, end_idx)) / (end_idx - start_idx)
-        smoothed_point = TrackPoint(lat=point.lat, lon=point.lon, elevation=avg_elevation, time=point.time, distance_from_start=point.distance_from_start)
+        avg_elevation = sum(
+            trackpoints[j].elevation for j in range(start_idx, end_idx)
+        ) / (end_idx - start_idx)
+        smoothed_point = TrackPoint(
+            lat=point.lat,
+            lon=point.lon,
+            elevation=avg_elevation,
+            time=point.time,
+            distance_from_start=point.distance_from_start,
+        )
         smoothed.append(smoothed_point)
     return smoothed
 
 
-def calculate_segment_grades(trackpoints: List[TrackPoint], segment_size_m: float = 100) -> List[TrackPoint]:
+def calculate_segment_grades(
+    trackpoints: List[TrackPoint], segment_size_m: float = 100
+) -> List[TrackPoint]:
     """Calculate grade percentage for each trackpoint."""
     if len(trackpoints) < 2:
         return trackpoints
     for i in range(1, len(trackpoints)):
-        distance_diff = trackpoints[i].distance_from_start - trackpoints[i-1].distance_from_start
-        elevation_diff = trackpoints[i].elevation - trackpoints[i-1].elevation
+        distance_diff = (
+            trackpoints[i].distance_from_start - trackpoints[i - 1].distance_from_start
+        )
+        elevation_diff = trackpoints[i].elevation - trackpoints[i - 1].elevation
         if distance_diff > 0:
             grade = (elevation_diff / distance_diff) * 100
         else:
@@ -444,8 +474,12 @@ def calculate_gap_adjusted_distance(trackpoints: List[TrackPoint]) -> float:
     """Calculate total GAP-adjusted distance in meters."""
     total_gap_distance = 0.0
     for i in range(1, len(trackpoints)):
-        segment_distance = trackpoints[i].distance_from_start - trackpoints[i-1].distance_from_start
-        avg_grade = (trackpoints[i].grade_percent + trackpoints[i-1].grade_percent) / 2
+        segment_distance = (
+            trackpoints[i].distance_from_start - trackpoints[i - 1].distance_from_start
+        )
+        avg_grade = (
+            trackpoints[i].grade_percent + trackpoints[i - 1].grade_percent
+        ) / 2
         gap_mult = gap_factor(avg_grade)
         total_gap_distance += segment_distance * gap_mult
     return total_gap_distance
@@ -465,7 +499,7 @@ def format_time(minutes: float) -> str:
 
 def parse_time_input(time_str: str) -> float:
     """Parse time string (HH:MM:SS or MM:SS) to minutes."""
-    parts = time_str.strip().split(':')
+    parts = time_str.strip().split(":")
     if len(parts) == 2:
         return float(parts[0]) + float(parts[1]) / 60
     elif len(parts) == 3:
@@ -476,14 +510,16 @@ def parse_time_input(time_str: str) -> float:
 
 def parse_pace_input(pace_str: str) -> float:
     """Parse pace string (MM:SS) to minutes per km."""
-    parts = pace_str.strip().split(':')
+    parts = pace_str.strip().split(":")
     if len(parts) == 2:
         return float(parts[0]) + float(parts[1]) / 60
     else:
         raise ValueError(f"Invalid pace format: {pace_str}")
 
 
-def get_fade_multiplier(power_fade: float, km: float, total_distance_km: float) -> float:
+def get_fade_multiplier(
+    power_fade: float, km: float, total_distance_km: float
+) -> float:
     """Calculate pace multiplier based on power fade setting."""
     if power_fade == 0:
         return 1.0
@@ -495,11 +531,15 @@ def get_fade_multiplier(power_fade: float, km: float, total_distance_km: float) 
         return 1.0 + fade_factor
 
 
-def calculate_elevation_changes(trackpoints: List[TrackPoint], start_km: float, end_km: float) -> Tuple[float, float]:
+def calculate_elevation_changes(
+    trackpoints: List[TrackPoint], start_km: float, end_km: float
+) -> Tuple[float, float]:
     """Calculate elevation gain and loss between two distances."""
     start_m = start_km * 1000
     end_m = end_km * 1000
-    segment_points = [p for p in trackpoints if start_m <= p.distance_from_start <= end_m]
+    segment_points = [
+        p for p in trackpoints if start_m <= p.distance_from_start <= end_m
+    ]
 
     if len(segment_points) < 2:
         return 0, 0
@@ -507,7 +547,7 @@ def calculate_elevation_changes(trackpoints: List[TrackPoint], start_km: float, 
     gain = 0
     loss = 0
     for i in range(1, len(segment_points)):
-        diff = segment_points[i].elevation - segment_points[i-1].elevation
+        diff = segment_points[i].elevation - segment_points[i - 1].elevation
         if diff > 0:
             gain += diff
         else:
@@ -516,7 +556,9 @@ def calculate_elevation_changes(trackpoints: List[TrackPoint], start_km: float, 
     return gain, loss
 
 
-def calculate_segment_gap_factor(trackpoints: List[TrackPoint], start_m: float, end_m: float) -> Tuple[float, float, float]:
+def calculate_segment_gap_factor(
+    trackpoints: List[TrackPoint], start_m: float, end_m: float
+) -> Tuple[float, float, float]:
     """Calculate weighted average GAP factor for a segment."""
     total_gap_weighted = 0.0
     total_distance = 0.0
@@ -524,7 +566,7 @@ def calculate_segment_gap_factor(trackpoints: List[TrackPoint], start_m: float, 
     elevations_in_segment = []
 
     for i in range(1, len(trackpoints)):
-        pt_start = trackpoints[i-1].distance_from_start
+        pt_start = trackpoints[i - 1].distance_from_start
         pt_end = trackpoints[i].distance_from_start
 
         if pt_end <= start_m or pt_start >= end_m:
@@ -535,7 +577,9 @@ def calculate_segment_gap_factor(trackpoints: List[TrackPoint], start_m: float, 
         overlap_distance = overlap_end - overlap_start
 
         if overlap_distance > 0:
-            avg_grade = (trackpoints[i].grade_percent + trackpoints[i-1].grade_percent) / 2
+            avg_grade = (
+                trackpoints[i].grade_percent + trackpoints[i - 1].grade_percent
+            ) / 2
             gap_mult = gap_factor(avg_grade)
             total_gap_weighted += overlap_distance * gap_mult
             total_distance += overlap_distance
@@ -544,8 +588,14 @@ def calculate_segment_gap_factor(trackpoints: List[TrackPoint], start_m: float, 
 
     if total_distance > 0:
         weighted_gap_mult = total_gap_weighted / total_distance
-        avg_grade = sum(grades_in_segment) / len(grades_in_segment) if grades_in_segment else 0
-        avg_elevation = sum(elevations_in_segment) / len(elevations_in_segment) if elevations_in_segment else 0
+        avg_grade = (
+            sum(grades_in_segment) / len(grades_in_segment) if grades_in_segment else 0
+        )
+        avg_elevation = (
+            sum(elevations_in_segment) / len(elevations_in_segment)
+            if elevations_in_segment
+            else 0
+        )
     else:
         weighted_gap_mult = 1.0
         avg_grade = 0.0
@@ -558,9 +608,13 @@ def calculate_segment_gap_factor(trackpoints: List[TrackPoint], start_m: float, 
 # ELEVATION SEGMENT DETECTION FUNCTIONS
 # =============================================================================
 
+
 @dataclass
 class ElevationSegment:
     """Represents a course segment classified by elevation change."""
+
+    start_idx: int
+    end_idx: int
     segment_number: int
     segment_type: str  # 'climb', 'descent', 'flat'
     start_km: float
@@ -577,7 +631,9 @@ class ElevationSegment:
     cumulative_time_min: float = 0.0
 
 
-def calculate_rolling_grade(trackpoints: List[TrackPoint], window_meters: float = 500) -> List[float]:
+def calculate_rolling_grade(
+    trackpoints: List[TrackPoint], window_meters: float = 200
+) -> List[float]:
     """Calculate smoothed grade using a distance-based rolling window.
 
     Args:
@@ -611,7 +667,9 @@ def calculate_rolling_grade(trackpoints: List[TrackPoint], window_meters: float 
                 weights.append(weight)
 
         if grades_in_window:
-            weighted_grade = sum(g * w for g, w in zip(grades_in_window, weights)) / sum(weights)
+            weighted_grade = sum(
+                g * w for g, w in zip(grades_in_window, weights)
+            ) / sum(weights)
             rolling_grades.append(weighted_grade)
         else:
             rolling_grades.append(point.grade_percent)
@@ -630,16 +688,18 @@ def classify_grade(grade_percent: float, threshold: float = 2.0) -> str:
         'climb', 'descent', or 'flat'
     """
     if grade_percent > threshold:
-        return 'climb'
+        return "climb"
     elif grade_percent < -threshold:
-        return 'descent'
+        return "descent"
     else:
-        return 'flat'
+        return "flat"
 
 
-def detect_elevation_segments(trackpoints: List[TrackPoint],
-                              min_segment_m: float = 500,
-                              grade_threshold: float = 2.0) -> List[ElevationSegment]:
+def detect_elevation_segments(
+    trackpoints: List[TrackPoint],
+    min_segment_m: float = 500,
+    grade_threshold: float = 2.0,
+) -> List[ElevationSegment]:
     """Detect elevation-based segments using rolling window and state machine.
 
     Args:
@@ -654,7 +714,7 @@ def detect_elevation_segments(trackpoints: List[TrackPoint],
         return []
 
     # Step 1: Calculate rolling grade over 500m window
-    rolling_grades = calculate_rolling_grade(trackpoints, window_meters=500)
+    rolling_grades = calculate_rolling_grade(trackpoints, window_meters=200)
 
     # Step 2: Classify each point
     classifications = [classify_grade(g, grade_threshold) for g in rolling_grades]
@@ -667,31 +727,34 @@ def detect_elevation_segments(trackpoints: List[TrackPoint],
     for i, classification in enumerate(classifications):
         if classification != current_type:
             # Check distance from segment start
-            segment_distance = trackpoints[i].distance_from_start - trackpoints[segment_start_idx].distance_from_start
+            segment_distance = (
+                trackpoints[i].distance_from_start
+                - trackpoints[segment_start_idx].distance_from_start
+            )
 
             if segment_distance >= min_segment_m:
                 # Create segment
-                raw_segments.append({
-                    'start_idx': segment_start_idx,
-                    'end_idx': i,
-                    'type': current_type
-                })
+                raw_segments.append(
+                    {"start_idx": segment_start_idx, "end_idx": i, "type": current_type}
+                )
                 segment_start_idx = i
                 current_type = classification
 
     # Add final segment
-    raw_segments.append({
-        'start_idx': segment_start_idx,
-        'end_idx': len(trackpoints) - 1,
-        'type': current_type
-    })
+    raw_segments.append(
+        {
+            "start_idx": segment_start_idx,
+            "end_idx": len(trackpoints) - 1,
+            "type": current_type,
+        }
+    )
 
     # Step 4: Merge adjacent same-type segments and filter short segments
     merged_segments = []
 
     for seg in raw_segments:
-        start_km = trackpoints[seg['start_idx']].distance_from_start / 1000
-        end_km = trackpoints[seg['end_idx']].distance_from_start / 1000
+        start_km = trackpoints[seg["start_idx"]].distance_from_start / 1000
+        end_km = trackpoints[seg["end_idx"]].distance_from_start / 1000
         distance_km = end_km - start_km
 
         # Skip segments shorter than minimum (unless it's the last one)
@@ -699,63 +762,102 @@ def detect_elevation_segments(trackpoints: List[TrackPoint],
             continue
 
         # Check if we can merge with previous segment of same type
-        if merged_segments and merged_segments[-1]['type'] == seg['type']:
+        if merged_segments and merged_segments[-1]["type"] == seg["type"]:
             # Extend previous segment
-            merged_segments[-1]['end_idx'] = seg['end_idx']
-            merged_segments[-1]['end_km'] = end_km
-            merged_segments[-1]['distance_km'] = merged_segments[-1]['end_km'] - merged_segments[-1]['start_km']
+            merged_segments[-1]["end_idx"] = seg["end_idx"]
+            merged_segments[-1]["end_km"] = end_km
+            merged_segments[-1]["distance_km"] = (
+                merged_segments[-1]["end_km"] - merged_segments[-1]["start_km"]
+            )
         else:
-            merged_segments.append({
-                'start_idx': seg['start_idx'],
-                'end_idx': seg['end_idx'],
-                'type': seg['type'],
-                'start_km': start_km,
-                'end_km': end_km,
-                'distance_km': distance_km
-            })
+            merged_segments.append(
+                {
+                    "start_idx": seg["start_idx"],
+                    "end_idx": seg["end_idx"],
+                    "type": seg["type"],
+                    "start_km": start_km,
+                    "end_km": end_km,
+                    "distance_km": distance_km,
+                }
+            )
 
     # Step 5: Create ElevationSegment objects with statistics
     elevation_segments = []
 
     for i, seg in enumerate(merged_segments):
-        start_idx = seg['start_idx']
-        end_idx = seg['end_idx']
+        start_idx = seg["start_idx"]
+        end_idx = seg["end_idx"]
 
         # Calculate segment statistics
         start_m = trackpoints[start_idx].distance_from_start
         end_m = trackpoints[end_idx].distance_from_start
 
         # Calculate weighted GAP factor
-        gap_mult, avg_grade, _ = calculate_segment_gap_factor(trackpoints, start_m, end_m)
-
+        gap_mult, avg_grade, _ = calculate_segment_gap_factor(
+            trackpoints, start_m, end_m
+        )
+        actual_grade = classify_grade(avg_grade, grade_threshold)
         # Calculate elevation changes
         elev_gain, elev_loss = calculate_elevation_changes(
-            trackpoints,
-            seg['start_km'],
-            seg['end_km']
+            trackpoints, seg["start_km"], seg["end_km"]
         )
 
-        elevation_segments.append(ElevationSegment(
-            segment_number=i + 1,
-            segment_type=seg['type'],
-            start_km=seg['start_km'],
-            end_km=seg['end_km'],
-            distance_km=seg['distance_km'],
-            avg_grade_percent=avg_grade,
-            elev_gain_m=elev_gain,
-            elev_loss_m=elev_loss,
-            net_elev_m=elev_gain - elev_loss,
-            gap_factor=gap_mult
-        ))
+        elevation_segments.append(
+            ElevationSegment(
+                start_idx=start_idx,
+                end_idx=end_idx,
+                segment_number=i + 1,
+                segment_type=actual_grade,
+                start_km=seg["start_km"],
+                end_km=seg["end_km"],
+                distance_km=seg["distance_km"],
+                avg_grade_percent=avg_grade,
+                elev_gain_m=elev_gain,
+                elev_loss_m=elev_loss,
+                net_elev_m=elev_gain - elev_loss,
+                gap_factor=gap_mult,
+            )
+        )
 
-    return elevation_segments
+    # One final pass to merge sequential elevation segments with the same type
+    final_segments = []
+    segment_number = 1
+    for segment in elevation_segments:
+        if final_segments and segment.segment_type == final_segments[-1].segment_type:
+            final_segments[-1].end_km = segment.end_km
+            final_segments[-1].end_idx = segment.end_idx
+            final_segments[-1].distance_km = (
+                final_segments[-1].end_km - final_segments[-1].start_km
+            )
+            final_segments[-1].elev_gain_m += segment.elev_gain_m
+            final_segments[-1].elev_loss_m += segment.elev_loss_m
+            final_segments[-1].net_elev_m = (
+                final_segments[-1].elev_gain_m - final_segments[-1].elev_loss_m
+            )
+
+            # Calculate weighted GAP factor
+            gap_mult, avg_grade, _ = calculate_segment_gap_factor(
+                trackpoints,
+                trackpoints[final_segments[-1].start_idx].distance_from_start,
+                trackpoints[segment.start_idx].distance_from_start,
+            )
+            final_segments[-1].gap_factor = gap_mult
+            final_segments[-1].avg_grade = avg_grade
+
+        else:
+            final_segments.append(segment)
+            final_segments[-1].segment_number = segment_number
+            segment_number += 1
+    return final_segments
 
 
-def calculate_segment_pacing(elevation_segments: List[ElevationSegment],
-                             trackpoints: List[TrackPoint],
-                             pacing_data: dict,
-                             power_fade: float,
-                             total_distance_km: float) -> List[ElevationSegment]:
+def calculate_segment_pacing(
+    elevation_segments: List[ElevationSegment],
+    trackpoints: List[TrackPoint],
+    pacing_data: dict,
+    power_fade: float,
+    total_distance_km: float,
+) -> List[ElevationSegment]:
     """Calculate pacing for each elevation segment.
 
     Args:
@@ -768,7 +870,7 @@ def calculate_segment_pacing(elevation_segments: List[ElevationSegment],
     Returns:
         Updated list of ElevationSegment objects with pacing data
     """
-    base_gap_pace = pacing_data['target_gap_pace']
+    base_gap_pace = pacing_data["target_gap_pace"]
     cumulative_time = 0.0
 
     for segment in elevation_segments:
@@ -793,10 +895,15 @@ def calculate_segment_pacing(elevation_segments: List[ElevationSegment],
     return elevation_segments
 
 
-def calculate_pacing(trackpoints: List[TrackPoint], target_finish_time_min: float,
-                     rest_stops: List[float], total_distance_km: float,
-                     gap_adjusted_distance_m: float, power_fade: float = 0.0,
-                     rest_duration_sec: int = 30) -> dict:
+def calculate_pacing(
+    trackpoints: List[TrackPoint],
+    target_finish_time_min: float,
+    rest_stops: List[float],
+    total_distance_km: float,
+    gap_adjusted_distance_m: float,
+    power_fade: float = 0.0,
+    rest_duration_sec: int = 30,
+) -> dict:
     """Calculate pacing based on GAP model."""
     gap_adjusted_distance_km = gap_adjusted_distance_m / 1000
     rest_duration_min = rest_duration_sec / 60.0
@@ -816,7 +923,9 @@ def calculate_pacing(trackpoints: List[TrackPoint], target_finish_time_min: floa
         start_dist = (km - 1) * 1000
         end_dist = km * 1000
 
-        gap_mult, avg_grade, avg_elevation = calculate_segment_gap_factor(trackpoints, start_dist, end_dist)
+        gap_mult, avg_grade, avg_elevation = calculate_segment_gap_factor(
+            trackpoints, start_dist, end_dist
+        )
         fade_mult = get_fade_multiplier(power_fade, km, total_distance_km)
         gap_pace = base_gap_pace * fade_mult
         actual_pace = gap_pace * gap_mult
@@ -824,18 +933,20 @@ def calculate_pacing(trackpoints: List[TrackPoint], target_finish_time_min: floa
         segment_time = actual_pace
         cumulative_time += segment_time
 
-        km_splits.append({
-            'km': km,
-            'actual_pace_min_km': actual_pace,
-            'gap_pace_min_km': gap_pace,
-            'base_gap_pace': base_gap_pace,
-            'gap_mult': gap_mult,
-            'fade_mult': fade_mult,
-            'grade_percent': avg_grade,
-            'elevation_m': avg_elevation,
-            'segment_time_min': segment_time,
-            'cumulative_time_min': cumulative_time
-        })
+        km_splits.append(
+            {
+                "km": km,
+                "actual_pace_min_km": actual_pace,
+                "gap_pace_min_km": gap_pace,
+                "base_gap_pace": base_gap_pace,
+                "gap_mult": gap_mult,
+                "fade_mult": fade_mult,
+                "grade_percent": avg_grade,
+                "elevation_m": avg_elevation,
+                "segment_time_min": segment_time,
+                "cumulative_time_min": cumulative_time,
+            }
+        )
 
     # Handle final partial km
     final_km = int(total_distance_km)
@@ -844,24 +955,30 @@ def calculate_pacing(trackpoints: List[TrackPoint], target_finish_time_min: floa
         start_dist = final_km * 1000
         end_dist = total_distance_km * 1000
 
-        gap_mult, avg_grade, avg_elevation = calculate_segment_gap_factor(trackpoints, start_dist, end_dist)
-        fade_mult = get_fade_multiplier(power_fade, total_distance_km, total_distance_km)
+        gap_mult, avg_grade, avg_elevation = calculate_segment_gap_factor(
+            trackpoints, start_dist, end_dist
+        )
+        fade_mult = get_fade_multiplier(
+            power_fade, total_distance_km, total_distance_km
+        )
         gap_pace = base_gap_pace * fade_mult
         actual_pace = gap_pace * gap_mult
         segment_time = actual_pace * remaining_distance_km
         cumulative_time += segment_time
-        km_splits.append({
-            'km': round(total_distance_km, 2),
-            'actual_pace_min_km': actual_pace,
-            'gap_pace_min_km': gap_pace,
-            'base_gap_pace': base_gap_pace,
-            'gap_mult': gap_mult,
-            'fade_mult': fade_mult,
-            'grade_percent': avg_grade,
-            'elevation_m': avg_elevation,
-            'segment_time_min': segment_time,
-            'cumulative_time_min': cumulative_time
-        })
+        km_splits.append(
+            {
+                "km": round(total_distance_km, 2),
+                "actual_pace_min_km": actual_pace,
+                "gap_pace_min_km": gap_pace,
+                "base_gap_pace": base_gap_pace,
+                "gap_mult": gap_mult,
+                "fade_mult": fade_mult,
+                "grade_percent": avg_grade,
+                "elevation_m": avg_elevation,
+                "segment_time_min": segment_time,
+                "cumulative_time_min": cumulative_time,
+            }
+        )
 
     # Calculate rest stop data
     rest_stop_data = []
@@ -871,59 +988,69 @@ def calculate_pacing(trackpoints: List[TrackPoint], target_finish_time_min: floa
     for stop_km in rest_stops:
         stop_time = 0.0
         for split in km_splits:
-            if split['km'] >= stop_km:
+            if split["km"] >= stop_km:
                 fraction = stop_km - int(stop_km)
                 if fraction > 0:
-                    stop_time = split['cumulative_time_min'] - split['segment_time_min'] * (1 - fraction)
+                    stop_time = split["cumulative_time_min"] - split[
+                        "segment_time_min"
+                    ] * (1 - fraction)
                 else:
-                    stop_time = split['cumulative_time_min']
+                    stop_time = split["cumulative_time_min"]
                 break
-            stop_time = split['cumulative_time_min']
+            stop_time = split["cumulative_time_min"]
 
         split_time = stop_time - prev_arrival_time
         split_distance = stop_km - prev_distance
 
-        elev_gain, elev_loss = calculate_elevation_changes(trackpoints, prev_distance, stop_km)
+        elev_gain, elev_loss = calculate_elevation_changes(
+            trackpoints, prev_distance, stop_km
+        )
 
         if split_distance > 0:
             actual_pace_segment = split_time / split_distance
-            segment_gap_pace = base_gap_pace * get_fade_multiplier(power_fade, (prev_distance + stop_km) / 2, total_distance_km)
+            segment_gap_pace = base_gap_pace * get_fade_multiplier(
+                power_fade, (prev_distance + stop_km) / 2, total_distance_km
+            )
         else:
             actual_pace_segment = 0
             segment_gap_pace = base_gap_pace
 
-        rest_stop_data.append({
-            'stop_number': len(rest_stop_data) + 1,
-            'distance_km': stop_km,
-            'arrival_time_min': stop_time,
-            'elapsed_time_str': format_time(stop_time),
-            'split_from_prev_min': split_time,
-            'split_distance_km': split_distance,
-            'actual_pace_min_km': actual_pace_segment,
-            'gap_pace_min_km': segment_gap_pace,
-            'elev_gain_m': elev_gain,
-            'elev_loss_m': elev_loss,
-            'suggested_rest_min': rest_duration_min,
-            'departure_time_min': stop_time + rest_duration_min
-        })
+        rest_stop_data.append(
+            {
+                "stop_number": len(rest_stop_data) + 1,
+                "distance_km": stop_km,
+                "arrival_time_min": stop_time,
+                "elapsed_time_str": format_time(stop_time),
+                "split_from_prev_min": split_time,
+                "split_distance_km": split_distance,
+                "actual_pace_min_km": actual_pace_segment,
+                "gap_pace_min_km": segment_gap_pace,
+                "elev_gain_m": elev_gain,
+                "elev_loss_m": elev_loss,
+                "suggested_rest_min": rest_duration_min,
+                "departure_time_min": stop_time + rest_duration_min,
+            }
+        )
         prev_arrival_time = stop_time
         prev_distance = stop_km
 
     return {
-        'km_splits': km_splits,
-        'rest_stops': rest_stop_data,
-        'target_gap_pace': base_gap_pace,
-        'total_gap_distance_km': gap_adjusted_distance_km,
-        'calculated_finish_time_min': cumulative_time,
-        'power_fade': power_fade,
-        'rest_duration_sec': rest_duration_sec,
-        'total_rest_time_min': total_rest_time_min,
-        'running_time_min': running_time_min
+        "km_splits": km_splits,
+        "rest_stops": rest_stop_data,
+        "target_gap_pace": base_gap_pace,
+        "total_gap_distance_km": gap_adjusted_distance_km,
+        "calculated_finish_time_min": cumulative_time,
+        "power_fade": power_fade,
+        "rest_duration_sec": rest_duration_sec,
+        "total_rest_time_min": total_rest_time_min,
+        "running_time_min": running_time_min,
     }
+
 
 # =============================================================================
 # CACHED DATA LOADING
 # =============================================================================
+
 
 @st.cache_data
 def load_gpx_data(gpx_file: str, smoothing_window: int):
@@ -935,64 +1062,116 @@ def load_gpx_data(gpx_file: str, smoothing_window: int):
     gap_distance_m = calculate_gap_adjusted_distance(trackpoints)
     return trackpoints, total_distance_m / 1000, gap_distance_m
 
+
 # =============================================================================
 # PLOTTING FUNCTIONS
 # =============================================================================
 
-def plot_elevation_profile(trackpoints: List[TrackPoint], rest_stops: List[float],
-                           total_distance_km: float, lang: str) -> plt.Figure:
+
+def plot_elevation_profile(
+    trackpoints: List[TrackPoint],
+    rest_stops: List[float],
+    total_distance_km: float,
+    lang: str,
+) -> plt.Figure:
     """Create elevation profile plot."""
     fig, ax = plt.subplots(figsize=(12, 4))
     distances_km = [p.distance_from_start / 1000 for p in trackpoints]
     elevations = [p.elevation for p in trackpoints]
-    ax.fill_between(distances_km, elevations, alpha=0.3, color='#2E86AB')
-    ax.plot(distances_km, elevations, color='#2E86AB', linewidth=2)
+    ax.fill_between(distances_km, elevations, alpha=0.3, color="#2E86AB")
+    ax.plot(distances_km, elevations, color="#2E86AB", linewidth=2)
     for stop in rest_stops:
-        ax.axvline(x=stop, color='#E94F37', linestyle='--', linewidth=1.5, alpha=0.8)
-        stop_idx = min(range(len(trackpoints)), key=lambda i: abs(trackpoints[i].distance_from_start / 1000 - stop))
+        ax.axvline(x=stop, color="#E94F37", linestyle="--", linewidth=1.5, alpha=0.8)
+        stop_idx = min(
+            range(len(trackpoints)),
+            key=lambda i: abs(trackpoints[i].distance_from_start / 1000 - stop),
+        )
         stop_elev = trackpoints[stop_idx].elevation
-        ax.annotate(f'Rest {rest_stops.index(stop) + 1}\n{stop} km', xy=(stop, stop_elev),
-                   xytext=(stop + 0.3, stop_elev + 8), fontsize=10, color='#E94F37', fontweight='bold')
-    ax.set_xlabel('Distance (km)', fontsize=12)
-    ax.set_ylabel(f'{t("elevation", lang)} (m)', fontsize=12)
-    ax.set_title(t('course_profile', lang), fontsize=14, fontweight='bold')
+        ax.annotate(
+            f"Rest {rest_stops.index(stop) + 1}\n{stop} km",
+            xy=(stop, stop_elev),
+            xytext=(stop + 0.3, stop_elev + 8),
+            fontsize=10,
+            color="#E94F37",
+            fontweight="bold",
+        )
+    ax.set_xlabel("Distance (km)", fontsize=12)
+    ax.set_ylabel(f"{t('elevation', lang)} (m)", fontsize=12)
+    ax.set_title(t("course_profile", lang), fontsize=14, fontweight="bold")
     ax.set_xlim(0, total_distance_km + 0.5)
     min_elev = min(elevations)
     max_elev = max(elevations)
-    ax.text(0.02, 0.95, f'{t("range", lang)}: {min_elev:.0f}m - {max_elev:.0f}m', transform=ax.transAxes,
-            fontsize=10, verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    ax.text(
+        0.02,
+        0.95,
+        f"{t('range', lang)}: {min_elev:.0f}m - {max_elev:.0f}m",
+        transform=ax.transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+    )
     plt.tight_layout()
     return fig
 
 
-def plot_pace_comparison(pacing_data: dict, total_distance_km: float, lang: str) -> plt.Figure:
+def plot_pace_comparison(
+    pacing_data: dict, total_distance_km: float, lang: str
+) -> plt.Figure:
     """Create pace comparison plot."""
     fig, ax = plt.subplots(figsize=(12, 4))
-    km_splits = pacing_data['km_splits']
+    km_splits = pacing_data["km_splits"]
     # Only include full kilometers (exclude partial final km like 21.06)
-    full_km_splits = [s for s in km_splits if s['km'] == int(s['km'])]
-    kms = [s['km'] for s in full_km_splits]
-    actual_paces = [s['actual_pace_min_km'] for s in full_km_splits]
-    gap_pace = pacing_data['target_gap_pace']
-    colors = ['#E94F37' if p > gap_pace else '#2E86AB' for p in actual_paces]
-    ax.bar(kms, [p * 60 for p in actual_paces], width=0.8, color=colors, alpha=0.7, label='Actual Pace')
-    ax.axhline(y=gap_pace * 60, color='#1B998B', linestyle='-', linewidth=2.5, label=f'GAP Pace ({format_time(gap_pace)}/km)')
-    ax.axvline(x=total_distance_km / 2, color='#888888', linestyle=':', linewidth=1.5, alpha=0.7)
-    ax.set_xlabel(t('km', lang).upper(), fontsize=12)
-    ax.set_ylabel(f'{t("pace", lang)} (sec/km)', fontsize=12)
-    ax.set_title(t('pace_per_km', lang), fontsize=14, fontweight='bold')
-    ax.legend(loc='upper right')
-    ax.text(0.02, 0.95, f'Red: {t("uphill", lang)} | Blue: {t("downhill", lang)}', transform=ax.transAxes, fontsize=10,
-            verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    full_km_splits = [s for s in km_splits if s["km"] == int(s["km"])]
+    kms = [s["km"] for s in full_km_splits]
+    actual_paces = [s["actual_pace_min_km"] for s in full_km_splits]
+    gap_pace = pacing_data["target_gap_pace"]
+    colors = ["#E94F37" if p > gap_pace else "#2E86AB" for p in actual_paces]
+    ax.bar(
+        kms,
+        [p * 60 for p in actual_paces],
+        width=0.8,
+        color=colors,
+        alpha=0.7,
+        label="Actual Pace",
+    )
+    ax.axhline(
+        y=gap_pace * 60,
+        color="#1B998B",
+        linestyle="-",
+        linewidth=2.5,
+        label=f"GAP Pace ({format_time(gap_pace)}/km)",
+    )
+    ax.axvline(
+        x=total_distance_km / 2,
+        color="#888888",
+        linestyle=":",
+        linewidth=1.5,
+        alpha=0.7,
+    )
+    ax.set_xlabel(t("km", lang).upper(), fontsize=12)
+    ax.set_ylabel(f"{t('pace', lang)} (sec/km)", fontsize=12)
+    ax.set_title(t("pace_per_km", lang), fontsize=14, fontweight="bold")
+    ax.legend(loc="upper right")
+    ax.text(
+        0.02,
+        0.95,
+        f"Red: {t('uphill', lang)} | Blue: {t('downhill', lang)}",
+        transform=ax.transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+    )
     plt.tight_layout()
     return fig
 
 
-def plot_segmented_elevation_profile(trackpoints: List[TrackPoint],
-                                      elevation_segments: List,
-                                      rest_stops: List[float],
-                                      total_distance_km: float,
-                                      lang: str) -> plt.Figure:
+def plot_segmented_elevation_profile(
+    trackpoints: List[TrackPoint],
+    elevation_segments: List,
+    rest_stops: List[float],
+    total_distance_km: float,
+    lang: str,
+) -> plt.Figure:
     """Create elevation profile with segments colored by type.
 
     Args:
@@ -1009,9 +1188,9 @@ def plot_segmented_elevation_profile(trackpoints: List[TrackPoint],
 
     # Color mapping for segment types
     segment_colors = {
-        'climb': '#E94F37',    # Red for climbs
-        'descent': '#2E86AB',  # Blue for descents
-        'flat': '#1B998B'      # Green for flats
+        "climb": "#E94F37",  # Red for climbs
+        "descent": "#2E86AB",  # Blue for descents
+        "flat": "#1B998B",  # Green for flats
     }
 
     # Plot each segment with its color
@@ -1020,8 +1199,9 @@ def plot_segmented_elevation_profile(trackpoints: List[TrackPoint],
         end_m = segment.end_km * 1000
 
         # Get trackpoints for this segment
-        segment_points = [p for p in trackpoints
-                         if start_m <= p.distance_from_start <= end_m]
+        segment_points = [
+            p for p in trackpoints if start_m <= p.distance_from_start <= end_m
+        ]
 
         if len(segment_points) < 2:
             continue
@@ -1029,7 +1209,7 @@ def plot_segmented_elevation_profile(trackpoints: List[TrackPoint],
         distances_km = [p.distance_from_start / 1000 for p in segment_points]
         elevations = [p.elevation for p in segment_points]
 
-        color = segment_colors.get(segment.segment_type, '#888888')
+        color = segment_colors.get(segment.segment_type, "#888888")
 
         # Fill the area under the curve
         ax.fill_between(distances_km, elevations, alpha=0.4, color=color)
@@ -1043,43 +1223,69 @@ def plot_segmented_elevation_profile(trackpoints: List[TrackPoint],
         type_label = t(segment.segment_type, lang)
 
         ax.annotate(
-            f'{type_label}\n{segment.distance_km:.1f}km\n{segment.avg_grade_percent:+.1f}%',
+            f"{segment.segment_number}: {type_label}\n{segment.distance_km:.1f}km\n{segment.avg_grade_percent:+.1f}%",
             xy=(mid_km, mid_elev),
             xytext=(mid_km, mid_elev + 15),
             fontsize=8,
-            ha='center',
-            va='bottom',
+            ha="center",
+            va="bottom",
             color=color,
-            fontweight='bold',
-            bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8, edgecolor=color)
+            fontweight="bold",
+            bbox=dict(
+                boxstyle="round,pad=0.3", facecolor="white", alpha=0.8, edgecolor=color
+            ),
         )
 
     # Add rest stop markers
     for stop in rest_stops:
-        ax.axvline(x=stop, color='#F4A261', linestyle='--', linewidth=1.5, alpha=0.8)
-        stop_idx = min(range(len(trackpoints)),
-                      key=lambda i: abs(trackpoints[i].distance_from_start / 1000 - stop))
+        ax.axvline(x=stop, color="#F4A261", linestyle="--", linewidth=1.5, alpha=0.8)
+        stop_idx = min(
+            range(len(trackpoints)),
+            key=lambda i: abs(trackpoints[i].distance_from_start / 1000 - stop),
+        )
         stop_elev = trackpoints[stop_idx].elevation
-        ax.annotate(f'R{rest_stops.index(stop) + 1}', xy=(stop, stop_elev),
-                   xytext=(stop, stop_elev + 25), fontsize=9, color='#F4A261',
-                   fontweight='bold', ha='center')
+        ax.annotate(
+            f"R{rest_stops.index(stop) + 1}",
+            xy=(stop, stop_elev),
+            xytext=(stop, stop_elev + 25),
+            fontsize=9,
+            color="#F4A261",
+            fontweight="bold",
+            ha="center",
+        )
 
     # Create legend for segment types
     from matplotlib.patches import Patch
-    legend_elements = [
-        Patch(facecolor='#E94F37', alpha=0.4, edgecolor='#E94F37',
-              label=f"{t('climb', lang)} (>{2.0}%)"),
-        Patch(facecolor='#2E86AB', alpha=0.4, edgecolor='#2E86AB',
-              label=f"{t('descent', lang)} (<-2%)"),
-        Patch(facecolor='#1B998B', alpha=0.4, edgecolor='#1B998B',
-              label=f"{t('flat', lang)} (-2% to +2%)"),
-    ]
-    ax.legend(handles=legend_elements, loc='upper right', fontsize=10)
 
-    ax.set_xlabel(t('km', lang).upper(), fontsize=12)
-    ax.set_ylabel(f'{t("elevation", lang)} (m)', fontsize=12)
-    ax.set_title(f"{t('elevation_segments', lang)} - {t('course_profile', lang)}",
-                fontsize=14, fontweight='bold')
+    legend_elements = [
+        Patch(
+            facecolor="#E94F37",
+            alpha=0.4,
+            edgecolor="#E94F37",
+            label=f"{t('climb', lang)} (>{2.0}%)",
+        ),
+        Patch(
+            facecolor="#2E86AB",
+            alpha=0.4,
+            edgecolor="#2E86AB",
+            label=f"{t('descent', lang)} (<-2%)",
+        ),
+        Patch(
+            facecolor="#1B998B",
+            alpha=0.4,
+            edgecolor="#1B998B",
+            label=f"{t('flat', lang)} (-2% to +2%)",
+        ),
+    ]
+    ax.legend(handles=legend_elements, loc="upper right", fontsize=10)
+
+    ax.set_xlabel(t("km", lang).upper(), fontsize=12)
+    ax.set_ylabel(f"{t('elevation', lang)} (m)", fontsize=12)
+    ax.set_title(
+        f"{t('elevation_segments', lang)} - {t('course_profile', lang)}",
+        fontsize=14,
+        fontweight="bold",
+    )
     ax.set_xlim(0, total_distance_km + 0.5)
 
     # Get elevation range for y-axis
@@ -1096,15 +1302,20 @@ def plot_segmented_elevation_profile(trackpoints: List[TrackPoint],
 # HELPER FUNCTIONS FOR DISPLAY
 # =============================================================================
 
+
 def generate_pocket_card(pacing_data: dict, total_distance_km: float) -> str:
     """Generate pocket card text for download."""
     lines = [
         "Point   km      Time      Pace      Elev",
         "─" * 42,
     ]
-    for stop in pacing_data['rest_stops']:
-        lines.append(f"R{stop['stop_number']}      {stop['distance_km']:.1f}     {stop['elapsed_time_str']}      {format_time(stop.get('actual_pace_min_km', 0))}/km   +{stop.get('elev_gain_m', 0):.0f}/-{stop.get('elev_loss_m', 0):.0f}")
-    lines.append(f"FINISH  {total_distance_km:.1f}    {format_time(pacing_data['calculated_finish_time_min'])}      -         -")
+    for stop in pacing_data["rest_stops"]:
+        lines.append(
+            f"R{stop['stop_number']}      {stop['distance_km']:.1f}     {stop['elapsed_time_str']}      {format_time(stop.get('actual_pace_min_km', 0))}/km   +{stop.get('elev_gain_m', 0):.0f}/-{stop.get('elev_loss_m', 0):.0f}"
+        )
+    lines.append(
+        f"FINISH  {total_distance_km:.1f}    {format_time(pacing_data['calculated_finish_time_min'])}      -         -"
+    )
     lines.append("─" * 42)
     return "\n".join(lines)
 
@@ -1115,19 +1326,27 @@ def generate_wrist_band(pacing_data: dict, total_distance_km: float) -> str:
         "km     Time    Pace",
         "─" * 22,
     ]
-    for stop in pacing_data['rest_stops']:
-        lines.append(f"{stop['distance_km']:.1f}    {stop['elapsed_time_str']}    {format_time(stop.get('actual_pace_min_km', 0))}")
-    lines.append(f"{total_distance_km:.1f}  {format_time(pacing_data['calculated_finish_time_min'])}    -")
+    for stop in pacing_data["rest_stops"]:
+        lines.append(
+            f"{stop['distance_km']:.1f}    {stop['elapsed_time_str']}    {format_time(stop.get('actual_pace_min_km', 0))}"
+        )
+    lines.append(
+        f"{total_distance_km:.1f}  {format_time(pacing_data['calculated_finish_time_min'])}    -"
+    )
     lines.append("─" * 22)
     return "\n".join(lines)
+
 
 # =============================================================================
 # MAIN APP
 # =============================================================================
 
+
 def main():
     # Load GPX data (cached)
-    trackpoints, total_distance_km, gap_adjusted_distance_m = load_gpx_data(GPX_FILE, SMOOTHING_WINDOW)
+    trackpoints, total_distance_km, gap_adjusted_distance_m = load_gpx_data(
+        GPX_FILE, SMOOTHING_WINDOW
+    )
 
     # Title and language selector
     col_title, col_lang = st.columns([4, 1])
@@ -1138,13 +1357,13 @@ def main():
             "Language",
             options=lang_options,
             format_func=lambda x: x[0],
-            label_visibility="collapsed"
+            label_visibility="collapsed",
         )
         lang = lang_selection[1]
 
     with col_title:
-        st.title(t('title', lang))
-        st.subheader(t('subtitle', lang))
+        st.title(t("title", lang))
+        st.subheader(t("subtitle", lang))
 
     # Course info
     st.markdown(f"**{t('course', lang)}:** 21.06 km with ~153m elevation gain")
@@ -1152,11 +1371,13 @@ def main():
 
     # Instructions expander
     with st.expander(f"📖 {t('how_to_use', lang)}"):
-        st.markdown(t('instructions', lang))
+        st.markdown(t("instructions", lang))
 
     # Course elevation profile - always visible as reference
     st.markdown(f"### {t('course_profile', lang)}")
-    fig_elevation = plot_elevation_profile(trackpoints, REST_STOPS, total_distance_km, lang)
+    fig_elevation = plot_elevation_profile(
+        trackpoints, REST_STOPS, total_distance_km, lang
+    )
     st.pyplot(fig_elevation)
     plt.close(fig_elevation)
 
@@ -1165,26 +1386,34 @@ def main():
         st.markdown(f"### {t('set_your_target', lang)}")
 
         input_mode = st.radio(
-            t('input_mode', lang),
-            [t('target_finish_time', lang), t('target_avg_pace', lang)]
+            t("input_mode", lang),
+            [t("target_finish_time", lang), t("target_avg_pace", lang)],
         )
 
-        if input_mode == t('target_finish_time', lang):
-            finish_time_str = st.text_input(t('finish_time', lang), value="01:45:00")
+        if input_mode == t("target_finish_time", lang):
+            finish_time_str = st.text_input(t("finish_time", lang), value="01:45:00")
             avg_pace_str = "05:00"
         else:
-            avg_pace_str = st.text_input(t('pace', lang), value="05:00")
+            avg_pace_str = st.text_input(t("pace", lang), value="05:00")
             finish_time_str = "01:45:00"
 
         power_fade = st.slider(
             f"{t('power_fade', lang)} (-10 to +10)",
-            min_value=-10, max_value=10, value=0, step=1
+            min_value=-10,
+            max_value=10,
+            value=0,
+            step=1,
         )
-        st.caption(f"💡 {t('negative_faster_finish', lang)} | {t('positive_faster_start', lang)} | {t('zero_even_pace', lang)}")
+        st.caption(
+            f"💡 {t('negative_faster_finish', lang)} | {t('positive_faster_start', lang)} | {t('zero_even_pace', lang)}"
+        )
 
         rest_duration = st.slider(
             f"{t('rest_duration', lang)} (seconds)",
-            min_value=0, max_value=120, value=30, step=5
+            min_value=0,
+            max_value=120,
+            value=30,
+            step=5,
         )
         st.caption(f"💡 {t('seconds_per_stop', lang)} ({t('no_stops', lang)} = 0)")
 
@@ -1193,22 +1422,30 @@ def main():
         st.markdown(f"#### {t('elevation_segments', lang)}")
         grade_threshold = st.slider(
             f"{t('grade_threshold', lang)} (%)",
-            min_value=1.0, max_value=5.0, value=2.0, step=0.5,
-            help=f"Higher = fewer, more significant segments. Lower = more granular."
+            min_value=1.0,
+            max_value=5.0,
+            value=2.0,
+            step=0.5,
+            help=f"Higher = fewer, more significant segments. Lower = more granular.",
         )
         min_segment_distance = st.slider(
             f"{t('min_segment', lang)} (m)",
-            min_value=200, max_value=1000, value=500, step=100,
-            help=f"Minimum distance for a segment. Smaller = more segments."
+            min_value=200,
+            max_value=1000,
+            value=500,
+            step=100,
+            help=f"Minimum distance for a segment. Smaller = more segments.",
         )
 
-        calculate_button = st.button(f"🏃 {t('calculate', lang)}", type="primary", width='stretch')
+        calculate_button = st.button(
+            f"🏃 {t('calculate', lang)}", type="primary", width="stretch"
+        )
 
     # Main content area
-    if calculate_button or 'pacing_data' in st.session_state:
+    if calculate_button or "pacing_data" in st.session_state:
         try:
             # Parse inputs
-            if input_mode == t('target_finish_time', lang):
+            if input_mode == t("target_finish_time", lang):
                 target_time_min = parse_time_input(finish_time_str)
             else:
                 pace_min_km = parse_pace_input(avg_pace_str)
@@ -1216,12 +1453,16 @@ def main():
 
             # Calculate pacing
             pacing_data = calculate_pacing(
-                trackpoints, target_time_min, REST_STOPS,
-                total_distance_km, gap_adjusted_distance_m,
-                power_fade=power_fade, rest_duration_sec=rest_duration
+                trackpoints,
+                target_time_min,
+                REST_STOPS,
+                total_distance_km,
+                gap_adjusted_distance_m,
+                power_fade=power_fade,
+                rest_duration_sec=rest_duration,
             )
-            st.session_state['pacing_data'] = pacing_data
-            st.session_state['target_time_min'] = target_time_min
+            st.session_state["pacing_data"] = pacing_data
+            st.session_state["target_time_min"] = target_time_min
 
         except Exception as e:
             st.error(f"Error: {e}")
@@ -1229,116 +1470,165 @@ def main():
             return
 
     # Display results if available
-    if 'pacing_data' in st.session_state:
-        pacing_data = st.session_state['pacing_data']
-        target_time_min = st.session_state.get('target_time_min', 105)
+    if "pacing_data" in st.session_state:
+        pacing_data = st.session_state["pacing_data"]
+        target_time_min = st.session_state.get("target_time_min", 105)
 
         # Detect elevation segments
         elevation_segments = detect_elevation_segments(
             trackpoints,
             min_segment_m=min_segment_distance,
-            grade_threshold=grade_threshold
+            grade_threshold=grade_threshold,
         )
 
         # Calculate pacing for each segment
         elevation_segments = calculate_segment_pacing(
-            elevation_segments,
-            trackpoints,
-            pacing_data,
-            power_fade,
-            total_distance_km
+            elevation_segments, trackpoints, pacing_data, power_fade, total_distance_km
         )
 
         # Store in session state for access
-        st.session_state['elevation_segments'] = elevation_segments
+        st.session_state["elevation_segments"] = elevation_segments
 
         # Create tabs
-        tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            f"{t('summary', lang)}",
-            f"{t('course_sections', lang)}",
-            f"{t('elevation_segments', lang)}",
-            f"{t('tables', lang)}",
-            f"{t('print_export', lang)}"
-        ])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(
+            [
+                f"{t('summary', lang)}",
+                f"{t('course_sections', lang)}",
+                f"{t('elevation_segments', lang)}",
+                f"{t('tables', lang)}",
+                f"{t('print_export', lang)}",
+            ]
+        )
 
         # ==================== TAB 1: SUMMARY ====================
         with tab1:
             # Strategy summary
-            st.markdown(f"### {t('target', lang)}: {format_time(target_time_min)} finish time")
+            st.markdown(
+                f"### {t('target', lang)}: {format_time(target_time_min)} finish time"
+            )
 
             # Strategy
-            fade = pacing_data['power_fade']
+            fade = pacing_data["power_fade"]
             if fade != 0:
-                fade_dir = t('strategy_positive', lang) if fade > 0 else t('strategy_negative', lang)
+                fade_dir = (
+                    t("strategy_positive", lang)
+                    if fade > 0
+                    else t("strategy_negative", lang)
+                )
                 fade_pct = abs(fade) * 0.5
-                fade_desc = t('faster_start', lang) if fade > 0 else t('slower_start', lang)
-                fade_desc2 = t('slower_finish', lang) if fade > 0 else t('faster_finish', lang)
+                fade_desc = (
+                    t("faster_start", lang) if fade > 0 else t("slower_start", lang)
+                )
+                fade_desc2 = (
+                    t("slower_finish", lang) if fade > 0 else t("faster_finish", lang)
+                )
                 st.markdown(f"📍 **{t('strategy', lang)}:** {fade_dir} ({fade:+d})")
-                st.markdown(f"   {t('pace_adjustment', lang)}: {fade_pct:.1f}% {fade_desc}, {fade_desc2}")
+                st.markdown(
+                    f"   {t('pace_adjustment', lang)}: {fade_pct:.1f}% {fade_desc}, {fade_desc2}"
+                )
             else:
                 st.markdown(f"📍 **{t('strategy', lang)}:** {t('strategy_even', lang)}")
 
             # Times
-            total_rest_time = pacing_data['total_rest_time_min']
-            running_time = pacing_data['running_time_min']
+            total_rest_time = pacing_data["total_rest_time_min"]
+            running_time = pacing_data["running_time_min"]
 
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric(t('running_time', lang), format_time(running_time))
+                st.metric(t("running_time", lang), format_time(running_time))
             with col2:
                 if total_rest_time > 0:
-                    st.metric(t('rest_time', lang), f"{format_time(total_rest_time)} ({len(REST_STOPS)} {t('stops', lang)})")
+                    st.metric(
+                        t("rest_time", lang),
+                        f"{format_time(total_rest_time)} ({len(REST_STOPS)} {t('stops', lang)})",
+                    )
                 else:
-                    st.metric(t('rest_time', lang), "0:00")
+                    st.metric(t("rest_time", lang), "0:00")
             with col3:
-                st.metric(t('total_time', lang), format_time(target_time_min))
+                st.metric(t("total_time", lang), format_time(target_time_min))
 
             col4, col5 = st.columns(2)
             with col4:
-                st.metric(t('avg_pace', lang), f"{format_time(running_time / total_distance_km)}/km")
+                st.metric(
+                    t("avg_pace", lang),
+                    f"{format_time(running_time / total_distance_km)}/km",
+                )
             with col5:
-                st.metric(t('gap_pace', lang), f"{format_time(pacing_data['target_gap_pace'])}/km")
+                st.metric(
+                    t("gap_pace", lang),
+                    f"{format_time(pacing_data['target_gap_pace'])}/km",
+                )
 
             # Split analysis
             st.markdown(f"### 📊 {t('split_analysis', lang)}")
 
             halfway_km = total_distance_km / 2
             first_half_time = 0.0
-            for split in pacing_data['km_splits']:
-                if split['km'] <= halfway_km:
-                    first_half_time += split['segment_time_min']
-                elif split['km'] > halfway_km:
-                    km_start = int(split['km'] - 1) if split['km'] == int(split['km']) else int(split['km'])
+            for split in pacing_data["km_splits"]:
+                if split["km"] <= halfway_km:
+                    first_half_time += split["segment_time_min"]
+                elif split["km"] > halfway_km:
+                    km_start = (
+                        int(split["km"] - 1)
+                        if split["km"] == int(split["km"])
+                        else int(split["km"])
+                    )
                     if km_start < halfway_km:
                         fraction_in_first = halfway_km - km_start
-                        first_half_time += split['actual_pace_min_km'] * fraction_in_first
+                        first_half_time += (
+                            split["actual_pace_min_km"] * fraction_in_first
+                        )
                     break
 
-            second_half_time = pacing_data['calculated_finish_time_min'] - first_half_time
+            second_half_time = (
+                pacing_data["calculated_finish_time_min"] - first_half_time
+            )
             first_half_distance = halfway_km
             second_half_distance = total_distance_km - halfway_km
-            first_half_pace = first_half_time / first_half_distance if first_half_distance > 0 else 0
-            second_half_pace = second_half_time / second_half_distance if second_half_distance > 0 else 0
+            first_half_pace = (
+                first_half_time / first_half_distance if first_half_distance > 0 else 0
+            )
+            second_half_pace = (
+                second_half_time / second_half_distance
+                if second_half_distance > 0
+                else 0
+            )
 
-            elev_gain_1st, elev_loss_1st = calculate_elevation_changes(trackpoints, 0, halfway_km)
-            elev_gain_2nd, elev_loss_2nd = calculate_elevation_changes(trackpoints, halfway_km, total_distance_km)
+            elev_gain_1st, elev_loss_1st = calculate_elevation_changes(
+                trackpoints, 0, halfway_km
+            )
+            elev_gain_2nd, elev_loss_2nd = calculate_elevation_changes(
+                trackpoints, halfway_km, total_distance_km
+            )
 
             col_left, col_right = st.columns(2)
             with col_left:
-                st.markdown(f"**{t('first_half', lang)} ({first_half_distance:.1f}km)**")
-                st.markdown(f"⏱️ {format_time(first_half_time)} @ {format_time(first_half_pace)}/km")
+                st.markdown(
+                    f"**{t('first_half', lang)} ({first_half_distance:.1f}km)**"
+                )
+                st.markdown(
+                    f"⏱️ {format_time(first_half_time)} @ {format_time(first_half_pace)}/km"
+                )
                 st.markdown(f"⛰️ +{elev_gain_1st:.0f}m / -{elev_loss_1st:.0f}m")
 
             with col_right:
-                st.markdown(f"**{t('second_half', lang)} ({second_half_distance:.1f}km)**")
-                st.markdown(f"⏱️ {format_time(second_half_time)} @ {format_time(second_half_pace)}/km")
+                st.markdown(
+                    f"**{t('second_half', lang)} ({second_half_distance:.1f}km)**"
+                )
+                st.markdown(
+                    f"⏱️ {format_time(second_half_time)} @ {format_time(second_half_pace)}/km"
+                )
                 st.markdown(f"⛰️ +{elev_gain_2nd:.0f}m / -{elev_loss_2nd:.0f}m")
 
             split_diff = second_half_time - first_half_time
             if split_diff > 0:
-                st.info(f"**{t('split', lang)}:** +{format_time(abs(split_diff))} ({t('slower_2nd', lang)})")
+                st.info(
+                    f"**{t('split', lang)}:** +{format_time(abs(split_diff))} ({t('slower_2nd', lang)})"
+                )
             elif split_diff < 0:
-                st.success(f"**{t('split', lang)}:** -{format_time(abs(split_diff))} ({t('faster_2nd', lang)})")
+                st.success(
+                    f"**{t('split', lang)}:** -{format_time(abs(split_diff))} ({t('faster_2nd', lang)})"
+                )
             else:
                 st.info(f"**{t('split', lang)}:** {t('even', lang)}")
 
@@ -1355,33 +1645,40 @@ def main():
             st.markdown(f"### {t('course_sections', lang)}")
 
             for i, section in enumerate(COURSE_SECTIONS):
-                start = section['start_km']
-                end = min(section['end_km'], total_distance_km)
-                name = section[f'name_{lang}']
-                strategy = section[f'strategy_{lang}']
-                pacing_tip = section[f'pacing_{lang}']
-                icon = section['icon']
+                start = section["start_km"]
+                end = min(section["end_km"], total_distance_km)
+                name = section[f"name_{lang}"]
+                strategy = section[f"strategy_{lang}"]
+                pacing_tip = section[f"pacing_{lang}"]
+                icon = section["icon"]
 
                 # Calculate section time from rest stops
-                if i < len(pacing_data['rest_stops']):
-                    section_time = pacing_data['rest_stops'][i]['split_from_prev_min']
-                    section_pace = pacing_data['rest_stops'][i]['actual_pace_min_km']
+                if i < len(pacing_data["rest_stops"]):
+                    section_time = pacing_data["rest_stops"][i]["split_from_prev_min"]
+                    section_pace = pacing_data["rest_stops"][i]["actual_pace_min_km"]
                 else:
                     # Last section
-                    section_time = pacing_data['calculated_finish_time_min'] - pacing_data['rest_stops'][-1]['arrival_time_min']
+                    section_time = (
+                        pacing_data["calculated_finish_time_min"]
+                        - pacing_data["rest_stops"][-1]["arrival_time_min"]
+                    )
                     distance = end - start
                     section_pace = section_time / distance if distance > 0 else 0
 
-                elev_gain, elev_loss = calculate_elevation_changes(trackpoints, start, end)
+                elev_gain, elev_loss = calculate_elevation_changes(
+                    trackpoints, start, end
+                )
 
                 with st.expander(f"{icon} {name} ({start:.1f} - {end:.1f} km)"):
                     col_a, col_b, col_c = st.columns(3)
                     with col_a:
-                        st.metric(t('time', lang), format_time(section_time))
+                        st.metric(t("time", lang), format_time(section_time))
                     with col_b:
-                        st.metric(t('pace', lang), f"{format_time(section_pace)}/km")
+                        st.metric(t("pace", lang), f"{format_time(section_pace)}/km")
                     with col_c:
-                        st.markdown(f"**{t('elev', lang)}:** +{elev_gain:.0f}m / -{elev_loss:.0f}m")
+                        st.markdown(
+                            f"**{t('elev', lang)}:** +{elev_gain:.0f}m / -{elev_loss:.0f}m"
+                        )
 
                     st.markdown(f"**{t('strategy', lang)}:** {strategy}")
                     st.info(f"💡 **{t('pacing_tip', lang)}:** {pacing_tip}")
@@ -1405,19 +1702,27 @@ def main():
             segment_data = []
             for segment in elevation_segments:
                 type_translated = t(segment.segment_type, lang)
-                segment_data.append({
-                    t('segment', lang): segment.segment_number,
-                    t('segment_type', lang): type_translated,
-                    t('distance_km', lang): f"{segment.start_km:.1f} - {segment.end_km:.1f} ({segment.distance_km:.1f}km)",
-                    t('avg_grade', lang): f"{segment.avg_grade_percent:+.1f}%",
-                    t('elev_delta', lang): f"+{segment.elev_gain_m:.0f}/-{segment.elev_loss_m:.0f}",
-                    t('actual', lang): f"{format_time(segment.actual_pace_min_km)}/km",
-                    'GAP': f"{format_time(segment.gap_pace_min_km)}/km",
-                    t('time', lang): format_time(segment.segment_time_min),
-                })
+                segment_data.append(
+                    {
+                        t("segment", lang): segment.segment_number,
+                        t("segment_type", lang): type_translated,
+                        t(
+                            "distance_km", lang
+                        ): f"{segment.start_km:.1f} - {segment.end_km:.1f} ({segment.distance_km:.1f}km)",
+                        t("avg_grade", lang): f"{segment.avg_grade_percent:+.1f}%",
+                        t(
+                            "elev_delta", lang
+                        ): f"+{segment.elev_gain_m:.0f}/-{segment.elev_loss_m:.0f}",
+                        t(
+                            "actual", lang
+                        ): f"{format_time(segment.actual_pace_min_km)}/km",
+                        "GAP": f"{format_time(segment.gap_pace_min_km)}/km",
+                        t("time", lang): format_time(segment.segment_time_min),
+                    }
+                )
 
             df_segments = pd.DataFrame(segment_data)
-            st.dataframe(df_segments, width='stretch', hide_index=True)
+            st.dataframe(df_segments, width="stretch", hide_index=True)
 
             st.divider()
 
@@ -1425,42 +1730,46 @@ def main():
             st.markdown(f"### {t('avg_pace_by_type', lang)}")
 
             # Calculate totals by type
-            type_stats = {'climb': {'dist': 0, 'time': 0}, 'descent': {'dist': 0, 'time': 0}, 'flat': {'dist': 0, 'time': 0}}
+            type_stats = {
+                "climb": {"dist": 0, "time": 0},
+                "descent": {"dist": 0, "time": 0},
+                "flat": {"dist": 0, "time": 0},
+            }
 
             for segment in elevation_segments:
-                type_stats[segment.segment_type]['dist'] += segment.distance_km
-                type_stats[segment.segment_type]['time'] += segment.segment_time_min
+                type_stats[segment.segment_type]["dist"] += segment.distance_km
+                type_stats[segment.segment_type]["time"] += segment.segment_time_min
 
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                climb_dist = type_stats['climb']['dist']
-                climb_time = type_stats['climb']['time']
+                climb_dist = type_stats["climb"]["dist"]
+                climb_time = type_stats["climb"]["time"]
                 climb_pace = climb_time / climb_dist if climb_dist > 0 else 0
                 st.metric(
                     f"⛰️ {t('total_climb_dist', lang)}",
                     f"{climb_dist:.1f} km",
-                    f"{format_time(climb_pace)}/km" if climb_dist > 0 else "-"
+                    f"{format_time(climb_pace)}/km" if climb_dist > 0 else "-",
                 )
 
             with col2:
-                descent_dist = type_stats['descent']['dist']
-                descent_time = type_stats['descent']['time']
+                descent_dist = type_stats["descent"]["dist"]
+                descent_time = type_stats["descent"]["time"]
                 descent_pace = descent_time / descent_dist if descent_dist > 0 else 0
                 st.metric(
                     f"📉 {t('total_descent_dist', lang)}",
                     f"{descent_dist:.1f} km",
-                    f"{format_time(descent_pace)}/km" if descent_dist > 0 else "-"
+                    f"{format_time(descent_pace)}/km" if descent_dist > 0 else "-",
                 )
 
             with col3:
-                flat_dist = type_stats['flat']['dist']
-                flat_time = type_stats['flat']['time']
+                flat_dist = type_stats["flat"]["dist"]
+                flat_time = type_stats["flat"]["time"]
                 flat_pace = flat_time / flat_dist if flat_dist > 0 else 0
                 st.metric(
                     f"➡️ {t('total_flat_dist', lang)}",
                     f"{flat_dist:.1f} km",
-                    f"{format_time(flat_pace)}/km" if flat_dist > 0 else "-"
+                    f"{format_time(flat_pace)}/km" if flat_dist > 0 else "-",
                 )
 
         # ==================== TAB 4: TABLES ====================
@@ -1469,38 +1778,59 @@ def main():
             st.markdown(f"### {t('rest_stop_arrival', lang)}")
 
             rest_data = []
-            for stop in pacing_data['rest_stops']:
-                rest_data.append({
-                    t('rest', lang): stop['stop_number'],
-                    'km': f"{stop['distance_km']:.1f}",
-                    t('elapsed', lang): stop['elapsed_time_str'],
-                    t('split_time', lang): format_time(stop['split_from_prev_min']),
-                    t('actual', lang): f"{format_time(stop.get('actual_pace_min_km', 0))}/km",
-                    'GAP': f"{format_time(stop.get('gap_pace_min_km', 0))}/km",
-                    t('elev_change', lang): f"+{stop.get('elev_gain_m', 0):.0f}/-{stop.get('elev_loss_m', 0):.0f}",
-                    t('rest', lang): f"{int(stop['suggested_rest_min'] * 60)}s"
-                })
+            for stop in pacing_data["rest_stops"]:
+                rest_data.append(
+                    {
+                        t("rest", lang): stop["stop_number"],
+                        "km": f"{stop['distance_km']:.1f}",
+                        t("elapsed", lang): stop["elapsed_time_str"],
+                        t("split_time", lang): format_time(stop["split_from_prev_min"]),
+                        t(
+                            "actual", lang
+                        ): f"{format_time(stop.get('actual_pace_min_km', 0))}/km",
+                        "GAP": f"{format_time(stop.get('gap_pace_min_km', 0))}/km",
+                        t(
+                            "elev_change", lang
+                        ): f"+{stop.get('elev_gain_m', 0):.0f}/-{stop.get('elev_loss_m', 0):.0f}",
+                        t("rest", lang): f"{int(stop['suggested_rest_min'] * 60)}s",
+                    }
+                )
 
             # Add finish row
-            finish_split_time = pacing_data['calculated_finish_time_min'] - pacing_data['rest_stops'][-1]['arrival_time_min']
-            finish_distance = total_distance_km - pacing_data['rest_stops'][-1]['distance_km']
+            finish_split_time = (
+                pacing_data["calculated_finish_time_min"]
+                - pacing_data["rest_stops"][-1]["arrival_time_min"]
+            )
+            finish_distance = (
+                total_distance_km - pacing_data["rest_stops"][-1]["distance_km"]
+            )
             elev_gain_finish, elev_loss_finish = calculate_elevation_changes(
-                trackpoints, pacing_data['rest_stops'][-1]['distance_km'], total_distance_km
+                trackpoints,
+                pacing_data["rest_stops"][-1]["distance_km"],
+                total_distance_km,
             )
 
-            rest_data.append({
-                t('rest', lang): f"🏁 {t('finish', lang)}",
-                'km': f"{total_distance_km:.2f}",
-                t('elapsed', lang): format_time(pacing_data['calculated_finish_time_min']),
-                t('split_time', lang): format_time(finish_split_time),
-                t('actual', lang): f"{format_time(finish_split_time / finish_distance if finish_distance > 0 else 0)}/km",
-                'GAP': '-',
-                t('elev_change', lang): f"+{elev_gain_finish:.0f}/-{elev_loss_finish:.0f}",
-                t('rest', lang): '-'
-            })
+            rest_data.append(
+                {
+                    t("rest", lang): f"🏁 {t('finish', lang)}",
+                    "km": f"{total_distance_km:.2f}",
+                    t("elapsed", lang): format_time(
+                        pacing_data["calculated_finish_time_min"]
+                    ),
+                    t("split_time", lang): format_time(finish_split_time),
+                    t(
+                        "actual", lang
+                    ): f"{format_time(finish_split_time / finish_distance if finish_distance > 0 else 0)}/km",
+                    "GAP": "-",
+                    t(
+                        "elev_change", lang
+                    ): f"+{elev_gain_finish:.0f}/-{elev_loss_finish:.0f}",
+                    t("rest", lang): "-",
+                }
+            )
 
             df_rest = pd.DataFrame(rest_data)
-            st.dataframe(df_rest, width='stretch', hide_index=True)
+            st.dataframe(df_rest, width="stretch", hide_index=True)
 
             st.divider()
 
@@ -1508,22 +1838,32 @@ def main():
             st.markdown(f"### {t('km_splits', lang)}")
 
             splits_data = []
-            for split in pacing_data['km_splits']:
-                km_start = int(split['km'] - 1) if split['km'] == int(split['km']) else int(split['km'])
-                km_end = split['km']
-                elev_gain, elev_loss = calculate_elevation_changes(trackpoints, km_start, km_end)
+            for split in pacing_data["km_splits"]:
+                km_start = (
+                    int(split["km"] - 1)
+                    if split["km"] == int(split["km"])
+                    else int(split["km"])
+                )
+                km_end = split["km"]
+                elev_gain, elev_loss = calculate_elevation_changes(
+                    trackpoints, km_start, km_end
+                )
 
-                splits_data.append({
-                    'KM': f"{split['km']:.1f}",
-                    t('actual', lang): f"{format_time(split['actual_pace_min_km'])}/km",
-                    'GAP': f"{format_time(split['gap_pace_min_km'])}/km",
-                    t('grade', lang): f"{split['grade_percent']:+.1f}%",
-                    t('elev_change', lang): f"+{elev_gain:.0f}/-{elev_loss:.0f}",
-                    t('total', lang): format_time(split['cumulative_time_min'])
-                })
+                splits_data.append(
+                    {
+                        "KM": f"{split['km']:.1f}",
+                        t(
+                            "actual", lang
+                        ): f"{format_time(split['actual_pace_min_km'])}/km",
+                        "GAP": f"{format_time(split['gap_pace_min_km'])}/km",
+                        t("grade", lang): f"{split['grade_percent']:+.1f}%",
+                        t("elev_change", lang): f"+{elev_gain:.0f}/-{elev_loss:.0f}",
+                        t("total", lang): format_time(split["cumulative_time_min"]),
+                    }
+                )
 
             df_splits = pd.DataFrame(splits_data)
-            st.dataframe(df_splits, width='stretch', hide_index=True)
+            st.dataframe(df_splits, width="stretch", hide_index=True)
 
         # ==================== TAB 5: PRINT/EXPORT ====================
         with tab5:
@@ -1539,7 +1879,7 @@ def main():
                     f"📥 {t('download_pocket', lang)}",
                     pocket_card,
                     file_name="race_pacing_pocket_card.txt",
-                    mime="text/plain"
+                    mime="text/plain",
                 )
 
             with col_right:
@@ -1550,7 +1890,7 @@ def main():
                     f"📥 {t('download_wrist', lang)}",
                     wrist_band,
                     file_name="race_pacing_wrist_band.txt",
-                    mime="text/plain"
+                    mime="text/plain",
                 )
 
             st.divider()
@@ -1559,16 +1899,40 @@ def main():
             st.markdown("### 📋 Finish Time Reference")
 
             ref_data = [
-                {"Finish Time": "1:30:00", "Avg Pace": "4:16/km", f"{t('level', lang)}": t('elite', lang)},
-                {"Finish Time": "1:40:00", "Avg Pace": "4:44/km", f"{t('level', lang)}": t('advanced', lang)},
-                {"Finish Time": "1:45:00", "Avg Pace": "5:00/km", f"{t('level', lang)}": t('competitive', lang)},
-                {"Finish Time": "1:50:00", "Avg Pace": "5:14/km", f"{t('level', lang)}": t('strong', lang)},
-                {"Finish Time": "2:00:00", "Avg Pace": "5:41/km", f"{t('level', lang)}": t('intermediate', lang)},
-                {"Finish Time": "2:15:00", "Avg Pace": "6:24/km", f"{t('level', lang)}": t('recreational', lang)},
+                {
+                    "Finish Time": "1:30:00",
+                    "Avg Pace": "4:16/km",
+                    f"{t('level', lang)}": t("elite", lang),
+                },
+                {
+                    "Finish Time": "1:40:00",
+                    "Avg Pace": "4:44/km",
+                    f"{t('level', lang)}": t("advanced", lang),
+                },
+                {
+                    "Finish Time": "1:45:00",
+                    "Avg Pace": "5:00/km",
+                    f"{t('level', lang)}": t("competitive", lang),
+                },
+                {
+                    "Finish Time": "1:50:00",
+                    "Avg Pace": "5:14/km",
+                    f"{t('level', lang)}": t("strong", lang),
+                },
+                {
+                    "Finish Time": "2:00:00",
+                    "Avg Pace": "5:41/km",
+                    f"{t('level', lang)}": t("intermediate", lang),
+                },
+                {
+                    "Finish Time": "2:15:00",
+                    "Avg Pace": "6:24/km",
+                    f"{t('level', lang)}": t("recreational", lang),
+                },
             ]
 
             df_ref = pd.DataFrame(ref_data)
-            st.dataframe(df_ref, width='stretch', hide_index=True)
+            st.dataframe(df_ref, width="stretch", hide_index=True)
 
 
 if __name__ == "__main__":
