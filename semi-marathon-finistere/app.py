@@ -1425,13 +1425,13 @@ def main():
             min_value=1.0,
             max_value=5.0,
             value=2.0,
-            step=0.5,
+            step=0.2,
             help=f"Higher = fewer, more significant segments. Lower = more granular.",
         )
         min_segment_distance = st.slider(
             f"{t('min_segment', lang)} (m)",
             min_value=200,
-            max_value=1000,
+            max_value=2000,
             value=500,
             step=100,
             help=f"Minimum distance for a segment. Smaller = more segments.",
