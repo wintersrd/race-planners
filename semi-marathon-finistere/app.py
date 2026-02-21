@@ -346,7 +346,7 @@ COURSE_SECTIONS = [
 REST_STOPS = [5.3, 9.1, 14.5]
 # Use absolute path based on script location for deployment compatibility
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-GPX_FILE = os.path.join(SCRIPT_DIR, 'WR-GPX-Semi-marathon-du-Finistere.gpx')
+GPX_FILE = os.path.join(SCRIPT_DIR, 'semi-marathon-du-finistere.gpx')
 SMOOTHING_WINDOW = 5
 
 # =============================================================================
