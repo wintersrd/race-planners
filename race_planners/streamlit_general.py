@@ -72,6 +72,9 @@ def render_general_planner(repo_root: Path) -> None:
             )
             if load_error is not None:
                 st.error(f"Could not load plan: {load_error}")
+                st.info(
+                    "If this is a missing GPX, upload the route file and retry loading the plan."
+                )
             else:
                 st.session_state["general_course_id"] = updated_state["general_course_id"]
                 st.session_state["general_config"] = updated_state["general_config"]
@@ -266,6 +269,25 @@ def render_general_planner(repo_root: Path) -> None:
             "Aid arrivals (min): "
             + ", ".join(f"{value:.1f}" for value in result.aid_arrival_times_min)
         )
+        st.markdown("#### Segment pacing")
+        st.dataframe(
+            [
+                {
+                    "type": segment.segment_type,
+                    "start_km": round(segment.start_km, 2),
+                    "end_km": round(segment.end_km, 2),
+                    "distance_km": round(segment.distance_km, 2),
+                    "avg_grade": round(segment.avg_grade_percent, 2),
+                    "avg_pace": round(segment.avg_pace_min_km, 2),
+                    "segment_min": round(segment.segment_time_min, 2),
+                }
+                for segment in result.segments
+            ],
+            width="stretch",
+            hide_index=True,
+        )
+
+        st.markdown("#### Kilometer pacing")
         st.dataframe(
             [
                 {

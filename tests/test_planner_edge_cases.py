@@ -16,7 +16,9 @@ def test_calculate_plan_ignores_out_of_range_aid_stops() -> None:
         terrain=base.terrain,
     )
     loaded = load_course_trackpoints(course)
-    config = PacingConfig(race_model="road_marathon", input_mode="effort_anchor", marathon_pace_min_km=5.5)
+    config = PacingConfig(
+        race_model="road_marathon", input_mode="effort_anchor", marathon_pace_min_km=5.5
+    )
 
     result = calculate_plan(loaded, config)
 
@@ -34,7 +36,9 @@ def test_calculate_plan_supports_course_without_aid_stops() -> None:
         terrain=base.terrain,
     )
     loaded = load_course_trackpoints(course)
-    config = PacingConfig(race_model="half_marathon", input_mode="finish_time", target_finish_time_min=110.0)
+    config = PacingConfig(
+        race_model="half_marathon", input_mode="finish_time", target_finish_time_min=110.0
+    )
 
     result = calculate_plan(loaded, config)
 

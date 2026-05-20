@@ -12,7 +12,9 @@ def test_load_plan_into_state_returns_user_facing_missing_gpx_error(tmp_path: Pa
         config=PacingConfig(race_model="road_marathon", input_mode="finish_time"),
     )
 
-    state, error = load_plan_into_state(payload_json, tmp_path, {"general_config": {}, "general_course_id": "x"})
+    state, error = load_plan_into_state(
+        payload_json, tmp_path, {"general_config": {}, "general_course_id": "x"}
+    )
 
     assert error is not None
     assert "Missing course file: missing-course.gpx" in error
@@ -35,7 +37,9 @@ def test_load_plan_into_state_restores_course_and_config(tmp_path: Path) -> None
         ),
     )
 
-    state, error = load_plan_into_state(payload_json, tmp_path, {"general_config": {}, "general_course_id": "x"})
+    state, error = load_plan_into_state(
+        payload_json, tmp_path, {"general_config": {}, "general_course_id": "x"}
+    )
 
     assert error is None
     assert state["general_course_id"] == "semi-marathon-finistere"

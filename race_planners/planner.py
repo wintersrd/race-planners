@@ -9,7 +9,14 @@ from race_planners.grade import (
     smooth_elevation,
     weighted_average_grade,
 )
-from race_planners.models import Course, PaceSplit, PacingConfig, PlanResult, TrackPoint
+from race_planners.models import (
+    Course,
+    PaceSplit,
+    PacingConfig,
+    PlanResult,
+    SegmentSummary,
+    TrackPoint,
+)
 from race_planners.pacing import (
     FireRoadUltraModel,
     GapEffortModel,
@@ -111,6 +118,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
             climb_m_per_km=max(avg_grade, 0.0) * 10,
         )
         pace_min_km = model.pace_for_context(context)
+        pace_min_km *= _fatigue_multiplier(config.race_model, progress_ratio)
         cumulative_time += pace_min_km
         splits.append(
             PaceSplit(
@@ -134,6 +142,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
             climb_m_per_km=max(avg_grade, 0.0) * 10,
         )
         pace_min_km = model.pace_for_context(context)
+        pace_min_km *= _fatigue_multiplier(config.race_model, 1.0)
         segment_time = pace_min_km * remaining
         cumulative_time += segment_time
         splits.append(
@@ -168,7 +177,92 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
 
     return PlanResult(
         splits=splits,
+        segments=_build_segment_summaries(splits),
         aid_arrival_times_min=aid_arrival_times,
         total_time_min=cumulative_time,
         total_distance_km=total_distance_km,
     )
+
+
+def _fatigue_multiplier(race_model: str, progress_ratio: float) -> float:
+    ratio = min(max(progress_ratio, 0.0), 1.0)
+    if race_model in {"road_marathon", "half_marathon"}:
+        if ratio <= 0.65:
+            return 1.0
+        return 1.0 + ((ratio - 0.65) / 0.35) * 0.04
+    if race_model == "fire_road_ultra":
+        if ratio <= 0.55:
+            return 1.0
+        return 1.0 + ((ratio - 0.55) / 0.45) * 0.06
+    if race_model == "technical_trail_ultra":
+        if ratio <= 0.5:
+            return 1.0
+        return 1.0 + ((ratio - 0.5) / 0.5) * 0.08
+    return 1.0
+
+
+def _segment_type(grade_percent: float) -> str:
+    if grade_percent >= 2.0:
+        return "climb"
+    if grade_percent <= -2.0:
+        return "descent"
+    return "flat"
+
+
+def _build_segment_summaries(splits: list[PaceSplit]) -> list[SegmentSummary]:
+    if not splits:
+        return []
+
+    segments: list[SegmentSummary] = []
+    current_type = _segment_type(splits[0].grade_percent)
+    start_km = 0.0
+    distance_km = 0.0
+    weighted_grade = 0.0
+    weighted_pace = 0.0
+    segment_time = 0.0
+    prev_end_km = 0.0
+
+    for split in splits:
+        end_km = split.km
+        split_distance = max(0.0, end_km - prev_end_km)
+        split_type = _segment_type(split.grade_percent)
+
+        if split_type != current_type and distance_km > 0:
+            segments.append(
+                SegmentSummary(
+                    segment_type=current_type,
+                    start_km=start_km,
+                    end_km=prev_end_km,
+                    distance_km=distance_km,
+                    avg_grade_percent=weighted_grade / distance_km,
+                    avg_pace_min_km=weighted_pace / distance_km,
+                    segment_time_min=segment_time,
+                )
+            )
+            current_type = split_type
+            start_km = prev_end_km
+            distance_km = 0.0
+            weighted_grade = 0.0
+            weighted_pace = 0.0
+            segment_time = 0.0
+
+        distance_km += split_distance
+        weighted_grade += split.grade_percent * split_distance
+        weighted_pace += split.actual_pace_min_km * split_distance
+        segment_time += split.segment_time_min
+        prev_end_km = end_km
+
+    if distance_km > 0:
+        segments.append(
+            SegmentSummary(
+                segment_type=current_type,
+                start_km=start_km,
+                end_km=prev_end_km,
+                distance_km=distance_km,
+                avg_grade_percent=weighted_grade / distance_km,
+                avg_pace_min_km=weighted_pace / distance_km,
+                segment_time_min=segment_time,
+            )
+        )
+
+    return segments

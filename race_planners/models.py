@@ -50,8 +50,20 @@ class PaceSplit:
 
 
 @dataclass
+class SegmentSummary:
+    segment_type: str
+    start_km: float
+    end_km: float
+    distance_km: float
+    avg_grade_percent: float
+    avg_pace_min_km: float
+    segment_time_min: float
+
+
+@dataclass
 class PlanResult:
     splits: list[PaceSplit]
+    segments: list[SegmentSummary]
     aid_arrival_times_min: list[float]
     total_time_min: float
     total_distance_km: float

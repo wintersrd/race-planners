@@ -8,6 +8,8 @@ Date: 2026-05-20
 - GPX parsing and grade helpers in `race_planners/grade.py`
 - Pacing models in `race_planners/pacing.py`
 - Reusable planner engine in `race_planners/planner.py`
+  - Includes progressive fatigue multipliers by race model
+  - Emits both kilometer splits and grouped segment pacing summaries
 - Local course library + upload persistence in `race_planners/course_library.py`
 - JSON plan I/O in `race_planners/plan_io.py`
 - Beta Streamlit flow in `race_planners/streamlit_general.py`
