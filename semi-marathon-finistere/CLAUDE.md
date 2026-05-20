@@ -9,14 +9,17 @@ A bilingual (English/French) Streamlit web application for race pacing strategy.
 ## Commands
 
 ```bash
-# Install dependencies
-pip install -r requirements-streamlit.txt
+# Install dependencies (from repository root)
+uv sync
 
-# Run the app
-streamlit run app.py
+# Run the app (from repository root)
+uv run streamlit run semi-marathon-finistere/app.py
 
 # Syntax check
-python -m py_compile app.py
+uv run python -m py_compile semi-marathon-finistere/app.py
+
+# Export Streamlit deployment requirements
+scripts/export_streamlit_requirements.sh
 ```
 
 ## Architecture

@@ -2,6 +2,23 @@
 
 A bilingual (English/French) interactive race pacing tool for the Semi-Marathon du Finistère.
 
+## Development Environment (Repository Standard)
+
+Use the repository root for all development commands.
+
+```bash
+uv sync
+uv run streamlit run semi-marathon-finistere/app.py
+```
+
+Deployment dependencies for Streamlit Community Cloud are generated via:
+
+```bash
+scripts/export_streamlit_requirements.sh
+```
+
+Do not hand-edit `semi-marathon-finistere/requirements.txt`.
+
 ---
 
 ## English
