@@ -9,12 +9,15 @@ import math
 import os
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import streamlit as st
+
+from race_planners.streamlit_general import render_general_planner
 
 # =============================================================================
 # PAGE CONFIG
@@ -1343,6 +1346,17 @@ def generate_wrist_band(pacing_data: dict, total_distance_km: float) -> str:
 
 
 def main():
+    planner_mode = st.radio(
+        "Planner mode",
+        options=["legacy_half_marathon", "general_beta"],
+        format_func=lambda x: "Legacy Half Marathon" if x == "legacy_half_marathon" else "General Planner (Beta)",
+        horizontal=True,
+    )
+
+    if planner_mode == "general_beta":
+        render_general_planner(Path(SCRIPT_DIR).parent)
+        return
+
     # Load GPX data (cached)
     trackpoints, total_distance_km, gap_adjusted_distance_m = load_gpx_data(
         GPX_FILE, SMOOTHING_WINDOW
