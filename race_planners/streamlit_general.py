@@ -34,6 +34,27 @@ def _default_config() -> dict[str, Any]:
     }
 
 
+def load_plan_into_state(
+    plan_json: str,
+    repo_root: Path,
+    current_state: dict[str, Any],
+) -> tuple[dict[str, Any], str | None]:
+    """Parse + validate plan JSON and return updated state or UI-safe error."""
+    try:
+        payload = import_plan_json(plan_json)
+        ensure_gpx_exists_for_plan(
+            payload,
+            [repo_root / "semi-marathon-finistere", repo_root / "courses", repo_root],
+        )
+    except (ValueError, FileNotFoundError) as exc:
+        return current_state, str(exc)
+
+    updated_state = dict(current_state)
+    updated_state["general_course_id"] = str(payload["course_id"])
+    updated_state["general_config"] = dict(payload["config"])
+    return updated_state, None
+
+
 def render_general_planner(repo_root: Path) -> None:
     st.title("General Race Planner (Beta)")
     st.caption("Pluggable pacing models with local course library + GPX upload + JSON plans.")
@@ -41,17 +62,20 @@ def render_general_planner(repo_root: Path) -> None:
     st.session_state.setdefault("general_config", _default_config())
     st.session_state.setdefault("general_course_id", "semi-marathon-finistere")
 
-    with st.expander("Load saved JSON plan"):
+    with st.expander("Load Saved Plan"):
         loaded_plan = st.file_uploader("Plan JSON", type=["json"], key="plan_json_uploader")
         if loaded_plan is not None:
-            payload = import_plan_json(loaded_plan.getvalue().decode("utf-8"))
-            ensure_gpx_exists_for_plan(
-                payload,
-                [repo_root / "semi-marathon-finistere", repo_root / "courses", repo_root],
+            updated_state, load_error = load_plan_into_state(
+                loaded_plan.getvalue().decode("utf-8"),
+                repo_root,
+                {str(key): st.session_state[key] for key in st.session_state.keys()},
             )
-            st.session_state["general_course_id"] = str(payload["course_id"])
-            st.session_state["general_config"] = dict(payload["config"])
-            st.success("Plan loaded. Review values and click Calculate.")
+            if load_error is not None:
+                st.error(f"Could not load plan: {load_error}")
+            else:
+                st.session_state["general_course_id"] = updated_state["general_course_id"]
+                st.session_state["general_config"] = updated_state["general_config"]
+                st.success("Plan loaded. Review values and click Calculate.")
 
     courses = list_courses(repo_root)
     course_index = 0
@@ -63,14 +87,20 @@ def render_general_planner(repo_root: Path) -> None:
     col_a, col_b = st.columns([3, 2])
     with col_a:
         selected_course = st.selectbox(
-            "Course",
+            "Course Library",
             options=courses,
             index=course_index,
             format_func=lambda c: f"{c.name} ({c.course_id})",
+            help="Choose a built-in route or any GPX from the local repository library.",
         )
 
     with col_b:
-        uploaded_gpx = st.file_uploader("Upload GPX", type=["gpx"], key="general_gpx_uploader")
+        uploaded_gpx = st.file_uploader(
+            "Upload GPX to Local Library",
+            type=["gpx"],
+            key="general_gpx_uploader",
+            help="Uploaded files are stored under courses/uploads and become selectable courses.",
+        )
         if uploaded_gpx is not None:
             upload_course = save_uploaded_gpx(
                 uploaded_gpx.name,
@@ -85,7 +115,7 @@ def render_general_planner(repo_root: Path) -> None:
     cfg = st.session_state["general_config"]
 
     race_model = st.selectbox(
-        "Race model",
+        "Race Model",
         options=[
             "road_marathon",
             "half_marathon",
@@ -98,10 +128,11 @@ def render_general_planner(repo_root: Path) -> None:
     )
 
     input_mode = st.radio(
-        "Input mode",
+        "Input Mode",
         options=["finish_time", "effort_anchor"],
         index=0 if cfg.get("input_mode") == "finish_time" else 1,
         horizontal=True,
+        help="Finish-time derives base pace from target finish. Effort-anchor uses your known pace anchor.",
     )
 
     target_finish_time_min: float | None = None
@@ -114,7 +145,7 @@ def render_general_planner(repo_root: Path) -> None:
     if race_model in {"road_marathon", "half_marathon"}:
         if input_mode == "finish_time":
             target_finish_time_min = st.number_input(
-                "Target finish time (minutes)",
+                "Target Finish Time (minutes)",
                 min_value=30.0,
                 max_value=2400.0,
                 value=float(cfg.get("target_finish_time_min") or 240.0),
@@ -122,7 +153,7 @@ def render_general_planner(repo_root: Path) -> None:
             )
         else:
             marathon_pace_min_km = st.number_input(
-                "Anchor pace (min/km)",
+                "Marathon/Half Anchor Pace (min/km)",
                 min_value=3.0,
                 max_value=20.0,
                 value=float(cfg.get("marathon_pace_min_km") or 5.5),
@@ -130,21 +161,21 @@ def render_general_planner(repo_root: Path) -> None:
             )
     elif race_model == "fire_road_ultra":
         z1_pace_min_km = st.number_input(
-            "Z1 pace (min/km)",
+            "Z1 Pace (min/km)",
             min_value=4.0,
             max_value=25.0,
             value=float(cfg.get("z1_pace_min_km") or 8.0),
             step=0.1,
         )
         z2_pace_min_km = st.number_input(
-            "Z2 pace (min/km)",
+            "Z2 Pace (min/km)",
             min_value=3.0,
             max_value=20.0,
             value=float(cfg.get("z2_pace_min_km") or 7.0),
             step=0.1,
         )
         hike_pace_min_km = st.number_input(
-            "Hike pace (min/km)",
+            "Hike Pace (min/km)",
             min_value=5.0,
             max_value=40.0,
             value=float(cfg.get("hike_pace_min_km") or 12.0),
@@ -152,14 +183,14 @@ def render_general_planner(repo_root: Path) -> None:
         )
     else:
         flat_pace_min_km = st.number_input(
-            "Flat pace (min/km)",
+            "Flat Pace (min/km)",
             min_value=4.0,
             max_value=25.0,
             value=float(cfg.get("flat_pace_min_km") or 8.5),
             step=0.1,
         )
         hike_pace_min_km = st.number_input(
-            "Hike pace (min/km)",
+            "Hike Pace (min/km)",
             min_value=5.0,
             max_value=40.0,
             value=float(cfg.get("hike_pace_min_km") or 13.0),
@@ -167,19 +198,36 @@ def render_general_planner(repo_root: Path) -> None:
         )
 
     climb_hike_threshold_percent = st.slider(
-        "Hike threshold (%)",
+        "Climb Hike Threshold (%)",
         min_value=5.0,
         max_value=25.0,
         value=float(cfg.get("climb_hike_threshold_percent", 12.0)),
         step=0.5,
     )
     descent_caution = st.selectbox(
-        "Descent caution",
+        "Descent Caution",
         options=["low", "medium", "high"],
         index=["low", "medium", "high"].index(cfg.get("descent_caution", "medium")),
     )
-    rpe_target = st.number_input("RPE target", min_value=1.0, max_value=10.0, value=6.0, step=0.5)
-    hr_cap = st.number_input("HR guardrail cap", min_value=80, max_value=210, value=155, step=1)
+    col_anchor_a, col_anchor_b = st.columns(2)
+    with col_anchor_a:
+        rpe_target = st.number_input(
+            "RPE Aggressiveness",
+            min_value=1.0,
+            max_value=10.0,
+            value=6.0,
+            step=0.5,
+            help="Secondary policy input: lower is conservative, higher is aggressive.",
+        )
+    with col_anchor_b:
+        hr_cap = st.number_input(
+            "HR Guardrail Cap",
+            min_value=80,
+            max_value=210,
+            value=155,
+            step=1,
+            help="Safety ceiling used as a guardrail when validating pacing choices.",
+        )
 
     new_config = PacingConfig(
         race_model=race_model,
@@ -198,7 +246,7 @@ def render_general_planner(repo_root: Path) -> None:
     )
     st.session_state["general_config"] = asdict(new_config)
 
-    if st.button("Calculate", type="primary"):
+    if st.button("Calculate Plan", type="primary"):
         if selected_course.course_id.startswith("upload:"):
             selected_course = get_course_by_id(repo_root, selected_course.course_id)
 
@@ -210,7 +258,7 @@ def render_general_planner(repo_root: Path) -> None:
     if "general_result" in st.session_state:
         result = st.session_state["general_result"]
         chosen_course = st.session_state["general_selected_course"]
-        st.subheader("Plan output")
+        st.subheader("Plan Output")
         st.write(
             f"Distance: {result.total_distance_km:.2f} km | Time: {result.total_time_min:.1f} min"
         )

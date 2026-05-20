@@ -1,6 +1,9 @@
 # race-planners
 
-Race planning applications and tools, currently focused on a Streamlit app for the Semi-Marathon du Finistere.
+Race planning applications and tools, centered on a Streamlit app with two planner modes:
+
+- `Legacy Half Marathon`: original Semi-Marathon du Finistere experience
+- `General Planner (Beta)`: pluggable race models + local course library + JSON plan save/load
 
 ## Python and environment
 
@@ -23,6 +26,15 @@ Run Streamlit from repository root so path behavior matches Streamlit Community 
 uv run streamlit run semi-marathon-finistere/app.py
 ```
 
+In-app mode switch:
+
+- `Legacy Half Marathon` keeps existing race-specific behavior and output tabs.
+- `General Planner (Beta)` supports:
+  - race models: `half_marathon`, `road_marathon`, `fire_road_ultra`, `technical_trail_ultra`
+  - input modes: `finish_time`, `effort_anchor`
+  - course sources: built-in local routes + GPX uploads persisted to `courses/uploads/`
+  - plan persistence: JSON download/reload (with explicit missing-GPX recovery message)
+
 ## Quality commands
 
 ```bash
@@ -43,6 +55,13 @@ scripts/check_streamlit_requirements.sh
 ```
 
 Do not hand-edit `semi-marathon-finistere/requirements.txt`.
+
+## Repository conventions for courses and plans
+
+- Local route library root: `courses/`
+- Uploaded GPX files are persisted in `courses/uploads/`
+- Plan files are JSON exports from the app and can reference local GPX filenames
+- If a referenced GPX is missing on reload, the app asks for re-upload
 
 ## Devcontainer
 

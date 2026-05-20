@@ -28,6 +28,7 @@ Do not hand-edit `semi-marathon-finistere/requirements.txt`.
 This tool helps runners plan their race strategy for the Semi-Marathon du Finistère (21.1 km with ~153m elevation gain). It uses **Grade-Adjusted Pace (GAP)** to account for elevation changes, providing realistic pace targets for each kilometer.
 
 Two versions are available:
+
 - **Streamlit Web App** (Recommended) - Fast, modern web interface
 - **Jupyter Notebook** - Original version for Voila
 
@@ -42,6 +43,28 @@ Two versions are available:
 - Elevation profile visualization
 - Per-kilometer pace breakdown
 
+### Planner Modes
+
+The Streamlit app now includes a mode switch at the top:
+
+- **Legacy Half Marathon**: original Semi-Marathon du Finistère planner flow
+- **General Planner (Beta)**: broader planner with pluggable models and local course library
+
+#### General Planner (Beta) highlights
+
+- Built-in local course library plus GPX upload support
+- Race models:
+  - `half_marathon`
+  - `road_marathon`
+  - `fire_road_ultra` (Z1/Z2/hike anchors)
+  - `technical_trail_ultra` (flat/hike + descent caution)
+- Input modes:
+  - `finish_time`
+  - `effort_anchor`
+- JSON plan export/import
+
+If a saved plan references a GPX file that is not available locally, the app shows an explicit recovery error and asks for GPX upload.
+
 ### Quick Start
 
 #### Option 1: Streamlit Web App (Recommended)
@@ -49,25 +72,29 @@ Two versions are available:
 1. **Install Python 3.9+** if you haven't already
 
 2. **Clone the repository:**
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/race-planners.git
    cd race-planners/semi-marathon-finistere
    ```
 
 3. **Create a virtual environment (optional but recommended):**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-4. **Install Streamlit dependencies:**
+4. **Install dependencies:**
+
    ```bash
-   pip install -r requirements-streamlit.txt
+   uv sync
    ```
 
 5. **Launch the Streamlit app:**
+
    ```bash
-   streamlit run app.py
+   uv run streamlit run semi-marathon-finistere/app.py
    ```
 
 6. Your browser will open automatically at `http://localhost:8501`
@@ -77,6 +104,7 @@ Two versions are available:
 For the original notebook interface:
 
 1. **Install Voila dependencies:**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -98,11 +126,11 @@ Then run all cells (Cell → Run All) to activate the interactive widgets.
 
 ### Course Information
 
-| Attribute | Value |
-|-----------|-------|
-| Distance | 21.06 km |
-| Elevation Gain | ~153m |
-| Rest Stops | 5.3 km, 9.1 km, 14.5 km |
+| Attribute      | Value                   |
+| -------------- | ----------------------- |
+| Distance       | 21.06 km                |
+| Elevation Gain | ~153m                   |
+| Rest Stops     | 5.3 km, 9.1 km, 14.5 km |
 
 ### How to Use
 
@@ -126,6 +154,7 @@ Then run all cells (Cell → Run All) to activate the interactive widgets.
 Cet outil aide les coureurs à planifier leur stratégie pour le Semi-Marathon du Finistère (21,1 km avec ~153m de dénivelé positif). Il utilise l'**Allure Ajustée au Dénivelé (GAP)** pour tenir compte des variations d'élévation, fournissant des objectifs d'allure réalistes pour chaque kilomètre.
 
 Deux versions sont disponibles:
+
 - **Application Web Streamlit** (Recommandé) - Interface web moderne et rapide
 - **Notebook Jupyter** - Version originale pour Voila
 
@@ -147,25 +176,29 @@ Deux versions sont disponibles:
 1. **Installez Python 3.9+** si ce n'est pas déjà fait
 
 2. **Clonez le dépôt:**
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/race-planners.git
    cd race-planners/semi-marathon-finistere
    ```
 
 3. **Créez un environnement virtuel (optionnel mais recommandé):**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # Sur Windows: venv\Scripts\activate
    ```
 
-4. **Installez les dépendances Streamlit:**
+4. **Installez les dépendances:**
+
    ```bash
-   pip install -r requirements-streamlit.txt
+   uv sync
    ```
 
 5. **Lancez l'application Streamlit:**
+
    ```bash
-   streamlit run app.py
+   uv run streamlit run semi-marathon-finistere/app.py
    ```
 
 6. Votre navigateur s'ouvrira automatiquement à `http://localhost:8501`
@@ -175,6 +208,7 @@ Deux versions sont disponibles:
 Pour l'interface originale du notebook:
 
 1. **Installez les dépendances Voila:**
+
    ```bash
    pip install -r requirements.txt
    ```
@@ -196,11 +230,11 @@ Puis exécutez toutes les cellules (Cell → Run All) pour activer les widgets i
 
 ### Informations sur le Parcours
 
-| Attribut | Valeur |
-|----------|--------|
-| Distance | 21,06 km |
-| Dénivelé positif | ~153m |
-| Ravitaillements | 5,3 km, 9,1 km, 14,5 km |
+| Attribut         | Valeur                  |
+| ---------------- | ----------------------- |
+| Distance         | 21,06 km                |
+| Dénivelé positif | ~153m                   |
+| Ravitaillements  | 5,3 km, 9,1 km, 14,5 km |
 
 ### Comment Utiliser
 
@@ -222,6 +256,7 @@ Puis exécutez toutes les cellules (Cell → Run All) pour activer les widgets i
 ### Dependencies / Dépendances
 
 **Streamlit App:**
+
 ```
 streamlit>=1.28.0
 numpy
@@ -230,6 +265,7 @@ pandas
 ```
 
 **Jupyter Notebook (Voila):**
+
 ```
 numpy
 matplotlib
@@ -239,15 +275,15 @@ voila
 
 ### Files / Fichiers
 
-| File | Description |
-|------|-------------|
-| `app.py` | Streamlit web application / Application web Streamlit |
+| File                                         | Description                                           |
+| -------------------------------------------- | ----------------------------------------------------- |
+| `app.py`                                     | Streamlit web application / Application web Streamlit |
 | `race_planner_semi_marathon_finistere.ipynb` | Original Jupyter notebook / Notebook Jupyter original |
-| `WR-GPX-Semi-marathon-du-Finistere.gpx` | Course GPX data / Données GPX du parcours |
-| `requirements-streamlit.txt` | Streamlit dependencies / Dépendances Streamlit |
-| `requirements.txt` | Voila dependencies / Dépendances Voila |
-| `.streamlit/config.toml` | Streamlit configuration / Configuration Streamlit |
-| `README.md` | This file / Ce fichier |
+| `WR-GPX-Semi-marathon-du-Finistere.gpx`      | Course GPX data / Données GPX du parcours             |
+| `requirements-streamlit.txt`                 | Streamlit dependencies / Dépendances Streamlit        |
+| `requirements.txt`                           | Voila dependencies / Dépendances Voila                |
+| `.streamlit/config.toml`                     | Streamlit configuration / Configuration Streamlit     |
+| `README.md`                                  | This file / Ce fichier                                |
 
 ---
 
@@ -281,6 +317,7 @@ docker run -p 8501:8501 race-planner
 ```
 
 Example `Dockerfile`:
+
 ```dockerfile
 FROM python:3.11-slim
 WORKDIR /app
@@ -291,7 +328,6 @@ EXPOSE 8501
 CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0.0"]
 ```
 
-
 ---
 
 ## License / Licence
@@ -301,6 +337,7 @@ MIT License
 ## Contributing / Contribution
 
 Contributions welcome! Feel free to:
+
 - Add support for other races
 - Improve the pacing algorithms
 - Translate to additional languages
@@ -308,4 +345,4 @@ Contributions welcome! Feel free to:
 
 ---
 
-*Happy running! / Bonne course!*
+_Happy running! / Bonne course!_
