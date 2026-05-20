@@ -137,3 +137,13 @@ class TechnicalTrailUltraModel:
             climb_hike_threshold_percent=self.hike_threshold_percent,
             descent_caution=self.descent_caution,
         )
+
+
+@dataclass
+class GapEffortModel:
+    """Simple GAP-based effort model for half and marathon pacing."""
+
+    base_pace_min_km: float
+
+    def pace_for_context(self, context: PacingContext) -> float:
+        return self.base_pace_min_km * gap_factor(context.grade_percent)

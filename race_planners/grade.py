@@ -110,3 +110,29 @@ def calculate_segment_grades(
 def gap_factor(grade_percent: float) -> float:
     """Current GAP polynomial used by legacy planner."""
     return 0.0021 * grade_percent**2 + 0.034 * grade_percent + 1
+
+
+def weighted_average_grade(trackpoints: list[TrackPoint], start_m: float, end_m: float) -> float:
+    """Return weighted average grade percent between distances."""
+    total_distance = 0.0
+    weighted_grade = 0.0
+
+    for i in range(1, len(trackpoints)):
+        seg_start = trackpoints[i - 1].distance_from_start
+        seg_end = trackpoints[i].distance_from_start
+        if seg_end <= start_m or seg_start >= end_m:
+            continue
+
+        overlap_start = max(seg_start, start_m)
+        overlap_end = min(seg_end, end_m)
+        overlap = overlap_end - overlap_start
+        if overlap <= 0:
+            continue
+
+        grade = (trackpoints[i - 1].grade_percent + trackpoints[i].grade_percent) / 2
+        weighted_grade += grade * overlap
+        total_distance += overlap
+
+    if total_distance == 0:
+        return 0.0
+    return weighted_grade / total_distance

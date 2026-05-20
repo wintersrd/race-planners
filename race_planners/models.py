@@ -53,3 +53,5 @@ class PaceSplit:
 class PlanResult:
     splits: list[PaceSplit]
     aid_arrival_times_min: list[float]
+    total_time_min: float
+    total_distance_km: float
