@@ -38,7 +38,9 @@ def load_course_trackpoints(course: Course, smoothing_window: int = 5) -> Loaded
     )
 
 
-def _estimate_course_gap_multiplier(trackpoints: list[TrackPoint], total_distance_km: float) -> float:
+def _estimate_course_gap_multiplier(
+    trackpoints: list[TrackPoint], total_distance_km: float
+) -> float:
     if total_distance_km <= 0:
         return 1.0
     grade_sum = 0.0
@@ -50,9 +52,15 @@ def _estimate_course_gap_multiplier(trackpoints: list[TrackPoint], total_distanc
     return grade_sum / total_segments
 
 
-def _build_model(config: PacingConfig, trackpoints: list[TrackPoint], total_distance_km: float) -> PacingModel:
+def _build_model(
+    config: PacingConfig, trackpoints: list[TrackPoint], total_distance_km: float
+) -> PacingModel:
     if config.race_model == "fire_road_ultra":
-        if config.z1_pace_min_km is None or config.z2_pace_min_km is None or config.hike_pace_min_km is None:
+        if (
+            config.z1_pace_min_km is None
+            or config.z2_pace_min_km is None
+            or config.hike_pace_min_km is None
+        ):
             raise ValueError("fire_road_ultra requires Z1 pace, Z2 pace, and hike pace")
         return FireRoadUltraModel(
             z1_pace_min_km=config.z1_pace_min_km,
