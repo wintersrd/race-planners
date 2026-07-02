@@ -21,13 +21,24 @@ def test_list_courses_includes_gpx_from_local_library(tmp_path: Path) -> None:
 def test_get_builtin_courses_uses_curated_event_catalog(tmp_path: Path) -> None:
     course_dir = tmp_path / "semi-marathon-finistere"
     course_dir.mkdir()
-    for filename in [
-        "semi-marathon-du-finistere.gpx",
-        "2026-grf56.gpx",
-        "2026-grf92.gpx",
-        "2026-grf166.gpx",
-    ]:
-        (course_dir / filename).write_text("<gpx></gpx>", encoding="utf-8")
+    (course_dir / "semi-marathon-du-finistere.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+    (course_dir / "2026-grf92.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+    (course_dir / "2026-grf166.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+    (course_dir / "2026-grf56.gpx").write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="48.0" lon="-3.99"><type>ravitoliquide</type></wpt>
+  <trk>
+    <trkseg>
+      <trkpt lat="48.0" lon="-4.0"><ele>5</ele></trkpt>
+      <trkpt lat="48.0" lon="-3.99"><ele>5</ele></trkpt>
+      <trkpt lat="48.0" lon="-3.98"><ele>5</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>
+""",
+        encoding="utf-8",
+    )
 
     courses = get_builtin_courses(tmp_path)
 
@@ -37,6 +48,8 @@ def test_get_builtin_courses_uses_curated_event_catalog(tmp_path: Path) -> None:
         "grf92",
         "grf166",
     ]
+    grf56 = next(course for course in courses if course.course_id == "grf56")
+    assert len(grf56.aid_stops_km) == 1
 
 
 def test_save_uploaded_gpx_avoids_collisions(tmp_path: Path) -> None:

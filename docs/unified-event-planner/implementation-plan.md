@@ -19,6 +19,14 @@ Status: In progress
   - began event-first planner integration by selecting curated events and
     automatically deriving course/model defaults in the general planner
   - added catalog and planner-state test coverage for the new event layer
+- Phase 2 completed:
+  - upgraded the shared GPX parser to support route-point-only GPX files in
+    addition to track-point GPX files
+  - added waypoint-derived aid-stop extraction in the shared grade/course
+    loading path
+  - taught curated and library course loading to populate aid stops from GPX
+    when catalog overrides are absent
+  - added tests for `rtept` parsing and aid-stop extraction behavior
 
 ## Objective
 

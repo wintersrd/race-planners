@@ -4,21 +4,26 @@ import re
 from pathlib import Path
 
 from race_planners.event_catalog import list_curated_events
+from race_planners.grade import extract_aid_stops_km
 from race_planners.models import Course
 
 
 def get_builtin_courses(repo_root: Path) -> list[Course]:
     """Return built-in course definitions shipped in repository."""
-    return [
-        Course(
-            course_id=event.course_id,
-            name=event.name,
-            gpx_path=repo_root / event.gpx_relative_path,
-            aid_stops_km=list(event.aid_stops_km),
-            terrain=event.terrain,
+    courses: list[Course] = []
+    for event in list_curated_events(repo_root):
+        gpx_path = repo_root / event.gpx_relative_path
+        aid_stops_km = list(event.aid_stops_km) or extract_aid_stops_km(str(gpx_path))
+        courses.append(
+            Course(
+                course_id=event.course_id,
+                name=event.name,
+                gpx_path=gpx_path,
+                aid_stops_km=aid_stops_km,
+                terrain=event.terrain,
+            )
         )
-        for event in list_curated_events(repo_root)
-    ]
+    return courses
 
 
 def get_course_by_id(repo_root: Path, course_id: str) -> Course:
@@ -40,7 +45,7 @@ def _course_from_gpx(gpx_path: Path, namespace: str = "local") -> Course:
         course_id=f"{namespace}:{_slugify(stem)}",
         name=stem.replace("-", " ").replace("_", " ").title(),
         gpx_path=gpx_path,
-        aid_stops_km=[],
+        aid_stops_km=extract_aid_stops_km(str(gpx_path)),
         terrain="mixed",
     )
 

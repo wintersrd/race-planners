@@ -30,19 +30,23 @@ def parse_gpx(filepath: str) -> list[TrackPoint]:
     cumulative_distance = 0.0
     prev_point: TrackPoint | None = None
 
-    for trkpt in root.findall(".//gpx:trkpt", ns):
-        lat_attr = trkpt.get("lat")
-        lon_attr = trkpt.get("lon")
+    point_elements = root.findall(".//gpx:trkpt", ns)
+    if not point_elements:
+        point_elements = root.findall(".//gpx:rtept", ns)
+
+    for point_elem in point_elements:
+        lat_attr = point_elem.get("lat")
+        lon_attr = point_elem.get("lon")
         if lat_attr is None or lon_attr is None:
             continue
 
         lat = float(lat_attr)
         lon = float(lon_attr)
-        ele_elem = trkpt.find("gpx:ele", ns)
+        ele_elem = point_elem.find("gpx:ele", ns)
         elevation = (
             float(ele_elem.text) if (ele_elem is not None and ele_elem.text is not None) else 0.0
         )
-        time_elem = trkpt.find("gpx:time", ns)
+        time_elem = point_elem.find("gpx:time", ns)
         time = time_elem.text if (time_elem is not None and time_elem.text is not None) else ""
         if prev_point is not None:
             distance = haversine(prev_point.lat, prev_point.lon, lat, lon)
@@ -59,6 +63,72 @@ def parse_gpx(filepath: str) -> list[TrackPoint]:
         prev_point = point
 
     return trackpoints
+
+
+def extract_aid_stops_km(filepath: str) -> list[float]:
+    """Extract aid-station distances from GPX waypoints when available."""
+    trackpoints = parse_gpx(filepath)
+    if not trackpoints:
+        return []
+
+    tree = ET.parse(filepath)
+    root = tree.getroot()
+    ns = {"gpx": "http://www.topografix.com/GPX/1/1"}
+    aid_distances_km: list[float] = []
+    total_distance_m = trackpoints[-1].distance_from_start
+
+    for waypoint in root.findall(".//gpx:wpt", ns):
+        lat_attr = waypoint.get("lat")
+        lon_attr = waypoint.get("lon")
+        if lat_attr is None or lon_attr is None:
+            continue
+
+        name_text = _child_text(waypoint, "gpx:name", ns)
+        type_text = _child_text(waypoint, "gpx:type", ns)
+        if not _is_aid_waypoint(name_text, type_text):
+            continue
+
+        distance_m = _nearest_trackpoint_distance_m(
+            trackpoints,
+            lat=float(lat_attr),
+            lon=float(lon_attr),
+        )
+        if distance_m <= 0 or distance_m >= total_distance_m:
+            continue
+        aid_distances_km.append(distance_m / 1000)
+
+    aid_distances_km.sort()
+    deduped: list[float] = []
+    for distance_km in aid_distances_km:
+        if deduped and abs(deduped[-1] - distance_km) < 0.05:
+            continue
+        deduped.append(round(distance_km, 2))
+    return deduped
+
+
+def _child_text(element: ET.Element, path: str, namespace: dict[str, str]) -> str:
+    child = element.find(path, namespace)
+    if child is None or child.text is None:
+        return ""
+    return child.text.strip()
+
+
+def _is_aid_waypoint(name_text: str, type_text: str) -> bool:
+    lowered = f"{name_text} {type_text}".strip().lower()
+    if not lowered:
+        return False
+
+    excluded_tokens = {"depart", "arrivee", "start", "finish", "begin", "end"}
+    if any(token in lowered for token in excluded_tokens):
+        return False
+
+    aid_tokens = ("ravito", "aid", "refresh", "water")
+    return any(token in lowered for token in aid_tokens)
+
+
+def _nearest_trackpoint_distance_m(trackpoints: list[TrackPoint], lat: float, lon: float) -> float:
+    closest_point = min(trackpoints, key=lambda point: haversine(point.lat, point.lon, lat, lon))
+    return closest_point.distance_from_start
 
 
 def smooth_elevation(trackpoints: list[TrackPoint], window_size: int = 3) -> list[TrackPoint]:
