@@ -178,42 +178,60 @@ def render_general_planner(repo_root: Path) -> None:
                 step=0.1,
             )
     elif race_model == "fire_road_ultra":
-        z1_pace_min_km = st.number_input(
-            "Z1 Pace (min/km)",
-            min_value=4.0,
-            max_value=25.0,
-            value=float(cfg.get("z1_pace_min_km") or 8.0),
-            step=0.1,
-        )
-        z2_pace_min_km = st.number_input(
-            "Z2 Pace (min/km)",
-            min_value=3.0,
-            max_value=20.0,
-            value=float(cfg.get("z2_pace_min_km") or 7.0),
-            step=0.1,
-        )
-        hike_pace_min_km = st.number_input(
-            "Hike Pace (min/km)",
-            min_value=5.0,
-            max_value=40.0,
-            value=float(cfg.get("hike_pace_min_km") or 12.0),
-            step=0.1,
-        )
+        if input_mode == "finish_time":
+            target_finish_time_min = st.number_input(
+                "Target Finish Time (minutes)",
+                min_value=30.0,
+                max_value=4000.0,
+                value=float(cfg.get("target_finish_time_min") or 720.0),
+                step=10.0,
+            )
+        else:
+            z1_pace_min_km = st.number_input(
+                "Z1 Pace (min/km)",
+                min_value=4.0,
+                max_value=25.0,
+                value=float(cfg.get("z1_pace_min_km") or 8.0),
+                step=0.1,
+            )
+            z2_pace_min_km = st.number_input(
+                "Z2 Pace (min/km)",
+                min_value=3.0,
+                max_value=20.0,
+                value=float(cfg.get("z2_pace_min_km") or 7.0),
+                step=0.1,
+            )
+            hike_pace_min_km = st.number_input(
+                "Hike Pace (min/km)",
+                min_value=5.0,
+                max_value=40.0,
+                value=float(cfg.get("hike_pace_min_km") or 12.0),
+                step=0.1,
+            )
     else:
-        flat_pace_min_km = st.number_input(
-            "Flat Pace (min/km)",
-            min_value=4.0,
-            max_value=25.0,
-            value=float(cfg.get("flat_pace_min_km") or 8.5),
-            step=0.1,
-        )
-        hike_pace_min_km = st.number_input(
-            "Hike Pace (min/km)",
-            min_value=5.0,
-            max_value=40.0,
-            value=float(cfg.get("hike_pace_min_km") or 13.0),
-            step=0.1,
-        )
+        if input_mode == "finish_time":
+            target_finish_time_min = st.number_input(
+                "Target Finish Time (minutes)",
+                min_value=30.0,
+                max_value=4000.0,
+                value=float(cfg.get("target_finish_time_min") or 720.0),
+                step=10.0,
+            )
+        else:
+            flat_pace_min_km = st.number_input(
+                "Flat Pace (min/km)",
+                min_value=4.0,
+                max_value=25.0,
+                value=float(cfg.get("flat_pace_min_km") or 8.5),
+                step=0.1,
+            )
+            hike_pace_min_km = st.number_input(
+                "Hike Pace (min/km)",
+                min_value=5.0,
+                max_value=40.0,
+                value=float(cfg.get("hike_pace_min_km") or 13.0),
+                step=0.1,
+            )
 
     climb_hike_threshold_percent = st.slider(
         "Climb Hike Threshold (%)",

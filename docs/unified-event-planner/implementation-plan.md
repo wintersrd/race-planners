@@ -35,6 +35,15 @@ Status: In progress
   - preserved catalog override precedence by marking explicit event aid stops as
     `config_override` stations and GPX-derived points as `gpx_waypoint`
   - added tests for typed aid-station extraction and built-in course metadata
+- Phase 4 completed:
+  - added planner-side input normalization so finish-time mode now works for
+    trail and ultra models instead of only road-style models
+  - derived missing trail pacing anchors from target finish time by numerically
+    solving against the shared pacing engine
+  - updated the Streamlit planner UI so trail and ultra events can genuinely use
+    either finish-time or effort-anchor mode
+  - added tests covering finish-time normalization for `technical_trail_ultra`
+    and `fire_road_ultra`
 
 ## Objective
 

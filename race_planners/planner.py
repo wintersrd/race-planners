@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import Callable
 
 from race_planners.grade import (
     calculate_segment_grades,
@@ -97,9 +98,128 @@ def _build_model(
     raise ValueError("road/half model requires marathon pace or target finish time")
 
 
+def _normalize_config(
+    config: PacingConfig, trackpoints: list[TrackPoint], total_distance_km: float
+) -> PacingConfig:
+    if config.target_finish_time_min is None or total_distance_km <= 0:
+        return config
+
+    if config.race_model == "technical_trail_ultra" and (
+        config.flat_pace_min_km is None or config.hike_pace_min_km is None
+    ):
+        flat_pace_min_km = _solve_base_pace_for_target(
+            race_model=config.race_model,
+            target_finish_time_min=config.target_finish_time_min,
+            build_model=lambda base_pace: TechnicalTrailUltraModel(
+                flat_pace_min_km=base_pace,
+                hike_pace_min_km=max(base_pace * 1.55, base_pace + 4.0),
+                hike_threshold_percent=config.climb_hike_threshold_percent,
+                descent_caution=config.descent_caution,
+            ),
+            trackpoints=trackpoints,
+            total_distance_km=total_distance_km,
+        )
+        return replace(
+            config,
+            flat_pace_min_km=round(flat_pace_min_km, 2),
+            hike_pace_min_km=round(max(flat_pace_min_km * 1.55, flat_pace_min_km + 4.0), 2),
+        )
+
+    if config.race_model == "fire_road_ultra" and (
+        config.z1_pace_min_km is None
+        or config.z2_pace_min_km is None
+        or config.hike_pace_min_km is None
+    ):
+        z2_pace_min_km = _solve_base_pace_for_target(
+            race_model=config.race_model,
+            target_finish_time_min=config.target_finish_time_min,
+            build_model=lambda base_pace: FireRoadUltraModel(
+                z1_pace_min_km=max(base_pace * 1.12, base_pace + 0.6),
+                z2_pace_min_km=base_pace,
+                hike_pace_min_km=max(base_pace * 1.75, base_pace + 4.0),
+                hike_threshold_percent=config.climb_hike_threshold_percent,
+            ),
+            trackpoints=trackpoints,
+            total_distance_km=total_distance_km,
+        )
+        return replace(
+            config,
+            z1_pace_min_km=round(max(z2_pace_min_km * 1.12, z2_pace_min_km + 0.6), 2),
+            z2_pace_min_km=round(z2_pace_min_km, 2),
+            hike_pace_min_km=round(max(z2_pace_min_km * 1.75, z2_pace_min_km + 4.0), 2),
+        )
+
+    return config
+
+
+def _solve_base_pace_for_target(
+    race_model: str,
+    target_finish_time_min: float,
+    build_model: Callable[[float], PacingModel],
+    trackpoints: list[TrackPoint],
+    total_distance_km: float,
+) -> float:
+    low = 1.0
+    high = 60.0
+    for _ in range(32):
+        mid = (low + high) / 2
+        total_time_min = _simulate_total_time(
+            race_model=race_model,
+            model=build_model(mid),
+            trackpoints=trackpoints,
+            total_distance_km=total_distance_km,
+        )
+        if total_time_min < target_finish_time_min:
+            low = mid
+        else:
+            high = mid
+    return high
+
+
+def _simulate_total_time(
+    race_model: str,
+    model: PacingModel,
+    trackpoints: list[TrackPoint],
+    total_distance_km: float,
+) -> float:
+    cumulative_time = 0.0
+
+    full_km_count = int(total_distance_km)
+    for km in range(1, full_km_count + 1):
+        start_m: float = (km - 1) * 1000
+        end_m: float = km * 1000
+        avg_grade = weighted_average_grade(trackpoints, start_m, end_m)
+        progress_ratio = km / max(total_distance_km, 1.0)
+        context = PacingContext(
+            grade_percent=avg_grade,
+            progress_ratio=progress_ratio,
+            elapsed_hours=cumulative_time / 60,
+            climb_m_per_km=max(avg_grade, 0.0) * 10,
+        )
+        pace_min_km = model.pace_for_context(context)
+        cumulative_time += pace_min_km * _fatigue_multiplier(race_model, progress_ratio)
+
+    remaining = total_distance_km - full_km_count
+    if remaining > 0.01:
+        start_m = float(full_km_count * 1000)
+        end_m = total_distance_km * 1000
+        avg_grade = weighted_average_grade(trackpoints, start_m, end_m)
+        context = PacingContext(
+            grade_percent=avg_grade,
+            progress_ratio=1.0,
+            elapsed_hours=cumulative_time / 60,
+            climb_m_per_km=max(avg_grade, 0.0) * 10,
+        )
+        pace_min_km = model.pace_for_context(context)
+        cumulative_time += pace_min_km * remaining * _fatigue_multiplier(race_model, 1.0)
+
+    return cumulative_time
+
+
 def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanResult:
     trackpoints = loaded_course.trackpoints
     total_distance_km = loaded_course.total_distance_km
+    config = _normalize_config(config, trackpoints, total_distance_km)
     model = _build_model(config, trackpoints, total_distance_km)
 
     splits: list[PaceSplit] = []
