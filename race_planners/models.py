@@ -14,13 +14,36 @@ class TrackPoint:
     grade_percent: float = 0.0
 
 
+@dataclass(frozen=True)
+class AidStation:
+    distance_km: float
+    label: str = ""
+    source: str = "config"
+    waypoint_type: str = ""
+
+
 @dataclass
 class Course:
     course_id: str
     name: str
     gpx_path: Path
     aid_stops_km: list[float] = field(default_factory=list)
+    aid_stations: list[AidStation] = field(default_factory=list)
     terrain: str = "road"
+    event_id: str | None = None
+    template_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.aid_stations and not self.aid_stops_km:
+            self.aid_stops_km = [aid_station.distance_km for aid_station in self.aid_stations]
+            return
+
+        if self.aid_stops_km and not self.aid_stations:
+            self.aid_stations = [
+                AidStation(distance_km=distance_km)
+                for distance_km in self.aid_stops_km
+                if distance_km > 0
+            ]
 
 
 @dataclass(frozen=True)

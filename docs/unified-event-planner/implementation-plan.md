@@ -27,6 +27,14 @@ Status: In progress
   - taught curated and library course loading to populate aid stops from GPX
     when catalog overrides are absent
   - added tests for `rtept` parsing and aid-stop extraction behavior
+- Phase 3 completed:
+  - expanded `Course` with typed aid-station metadata and explicit event/template
+    linkage while preserving normalized distance access for the planner
+  - upgraded GPX aid extraction to return typed station metadata instead of only
+    bare distances
+  - preserved catalog override precedence by marking explicit event aid stops as
+    `config_override` stations and GPX-derived points as `gpx_waypoint`
+  - added tests for typed aid-station extraction and built-in course metadata
 
 ## Objective
 

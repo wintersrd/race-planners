@@ -4,8 +4,8 @@ import re
 from pathlib import Path
 
 from race_planners.event_catalog import list_curated_events
-from race_planners.grade import extract_aid_stops_km
-from race_planners.models import Course
+from race_planners.grade import extract_aid_stations
+from race_planners.models import AidStation, Course
 
 
 def get_builtin_courses(repo_root: Path) -> list[Course]:
@@ -13,14 +13,16 @@ def get_builtin_courses(repo_root: Path) -> list[Course]:
     courses: list[Course] = []
     for event in list_curated_events(repo_root):
         gpx_path = repo_root / event.gpx_relative_path
-        aid_stops_km = list(event.aid_stops_km) or extract_aid_stops_km(str(gpx_path))
+        aid_stations = _aid_stations_for_event(gpx_path, event.aid_stops_km)
         courses.append(
             Course(
                 course_id=event.course_id,
                 name=event.name,
                 gpx_path=gpx_path,
-                aid_stops_km=aid_stops_km,
+                aid_stations=aid_stations,
                 terrain=event.terrain,
+                event_id=event.event_id,
+                template_id=event.template_id,
             )
         )
     return courses
@@ -45,7 +47,7 @@ def _course_from_gpx(gpx_path: Path, namespace: str = "local") -> Course:
         course_id=f"{namespace}:{_slugify(stem)}",
         name=stem.replace("-", " ").replace("_", " ").title(),
         gpx_path=gpx_path,
-        aid_stops_km=extract_aid_stops_km(str(gpx_path)),
+        aid_stations=extract_aid_stations(str(gpx_path)),
         terrain="mixed",
     )
 
@@ -84,3 +86,13 @@ def save_uploaded_gpx(
 
     target.write_bytes(upload_bytes)
     return _course_from_gpx(target, namespace="upload")
+
+
+def _aid_stations_for_event(gpx_path: Path, aid_stop_overrides_km: list[float]) -> list[AidStation]:
+    if aid_stop_overrides_km:
+        return [
+            AidStation(distance_km=distance_km, source="config_override")
+            for distance_km in aid_stop_overrides_km
+            if distance_km > 0
+        ]
+    return extract_aid_stations(str(gpx_path))

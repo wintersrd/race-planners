@@ -48,8 +48,13 @@ def test_get_builtin_courses_uses_curated_event_catalog(tmp_path: Path) -> None:
         "grf92",
         "grf166",
     ]
+    finistere = next(course for course in courses if course.course_id == "semi-marathon-finistere")
     grf56 = next(course for course in courses if course.course_id == "grf56")
+    assert finistere.event_id == "semi-marathon-finistere"
+    assert finistere.template_id == "road_half"
+    assert finistere.aid_stations[0].source == "config_override"
     assert len(grf56.aid_stops_km) == 1
+    assert grf56.aid_stations[0].source == "gpx_waypoint"
 
 
 def test_save_uploaded_gpx_avoids_collisions(tmp_path: Path) -> None:

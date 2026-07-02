@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import xml.etree.ElementTree as ET
 
-from race_planners.models import TrackPoint
+from race_planners.models import AidStation, TrackPoint
 
 
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -67,6 +67,11 @@ def parse_gpx(filepath: str) -> list[TrackPoint]:
 
 def extract_aid_stops_km(filepath: str) -> list[float]:
     """Extract aid-station distances from GPX waypoints when available."""
+    return [aid_station.distance_km for aid_station in extract_aid_stations(filepath)]
+
+
+def extract_aid_stations(filepath: str) -> list[AidStation]:
+    """Extract typed aid-station metadata from GPX waypoints when available."""
     trackpoints = parse_gpx(filepath)
     if not trackpoints:
         return []
@@ -74,7 +79,7 @@ def extract_aid_stops_km(filepath: str) -> list[float]:
     tree = ET.parse(filepath)
     root = tree.getroot()
     ns = {"gpx": "http://www.topografix.com/GPX/1/1"}
-    aid_distances_km: list[float] = []
+    aid_stations: list[AidStation] = []
     total_distance_m = trackpoints[-1].distance_from_start
 
     for waypoint in root.findall(".//gpx:wpt", ns):
@@ -95,14 +100,28 @@ def extract_aid_stops_km(filepath: str) -> list[float]:
         )
         if distance_m <= 0 or distance_m >= total_distance_m:
             continue
-        aid_distances_km.append(distance_m / 1000)
+        aid_stations.append(
+            AidStation(
+                distance_km=distance_m / 1000,
+                label=name_text or type_text,
+                source="gpx_waypoint",
+                waypoint_type=type_text,
+            )
+        )
 
-    aid_distances_km.sort()
-    deduped: list[float] = []
-    for distance_km in aid_distances_km:
-        if deduped and abs(deduped[-1] - distance_km) < 0.05:
+    aid_stations.sort(key=lambda aid_station: aid_station.distance_km)
+    deduped: list[AidStation] = []
+    for aid_station in aid_stations:
+        if deduped and abs(deduped[-1].distance_km - aid_station.distance_km) < 0.05:
             continue
-        deduped.append(round(distance_km, 2))
+        deduped.append(
+            AidStation(
+                distance_km=round(aid_station.distance_km, 2),
+                label=aid_station.label,
+                source=aid_station.source,
+                waypoint_type=aid_station.waypoint_type,
+            )
+        )
     return deduped
 
 

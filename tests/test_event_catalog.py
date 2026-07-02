@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from race_planners.course_library import get_builtin_courses
 from race_planners.event_catalog import get_curated_event, get_event_template, list_curated_events
 
 
@@ -38,3 +39,15 @@ def test_get_curated_event_returns_event_metadata(tmp_path: Path) -> None:
     assert event.course_id == "semi-marathon-finistere"
     assert event.aid_stops_km == [5.3, 9.1, 14.5]
     assert template.race_model == "half_marathon"
+
+
+def test_builtin_course_preserves_event_and_template_metadata(tmp_path: Path) -> None:
+    course_dir = tmp_path / "semi-marathon-finistere"
+    course_dir.mkdir()
+    (course_dir / "semi-marathon-du-finistere.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+
+    courses = get_builtin_courses(tmp_path)
+
+    assert len(courses) == 1
+    assert courses[0].event_id == "semi-marathon-finistere"
+    assert courses[0].template_id == "road_half"
