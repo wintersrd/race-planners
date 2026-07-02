@@ -6,7 +6,13 @@ from typing import Any
 
 import streamlit as st
 
-from race_planners.course_library import get_course_by_id, list_courses, save_uploaded_gpx
+from race_planners.course_library import get_course_by_id
+from race_planners.event_catalog import (
+    get_curated_event_by_course_id,
+    get_event_template,
+    list_curated_events,
+)
+from race_planners.models import CuratedEvent
 from race_planners.models import PacingConfig
 from race_planners.plan_io import (
     ensure_gpx_exists_for_plan,
@@ -34,6 +40,24 @@ def _default_config() -> dict[str, Any]:
     }
 
 
+def _default_config_for_event(event: CuratedEvent) -> dict[str, Any]:
+    config = _default_config()
+    config["race_model"] = event.race_model
+    config["input_mode"] = event.default_input_mode
+
+    if event.race_model == "half_marathon":
+        config["target_finish_time_min"] = 105.0
+    elif event.race_model == "road_marathon":
+        config["target_finish_time_min"] = 240.0
+    else:
+        config["input_mode"] = "effort_anchor"
+        config["target_finish_time_min"] = None
+        config["flat_pace_min_km"] = 8.5
+        config["hike_pace_min_km"] = 13.0
+
+    return config
+
+
 def load_plan_into_state(
     plan_json: str,
     repo_root: Path,
@@ -52,14 +76,18 @@ def load_plan_into_state(
     updated_state = dict(current_state)
     updated_state["general_course_id"] = str(payload["course_id"])
     updated_state["general_config"] = dict(payload["config"])
+    matched_event = get_curated_event_by_course_id(repo_root, str(payload["course_id"]))
+    if matched_event is not None:
+        updated_state["general_event_id"] = matched_event.event_id
     return updated_state, None
 
 
 def render_general_planner(repo_root: Path) -> None:
     st.title("General Race Planner (Beta)")
-    st.caption("Pluggable pacing models with local course library + GPX upload + JSON plans.")
+    st.caption("Curated event catalog with pluggable pacing models and JSON plan export/import.")
 
     st.session_state.setdefault("general_config", _default_config())
+    st.session_state.setdefault("general_event_id", "semi-marathon-finistere")
     st.session_state.setdefault("general_course_id", "semi-marathon-finistere")
 
     with st.expander("Load Saved Plan"):
@@ -80,60 +108,47 @@ def render_general_planner(repo_root: Path) -> None:
                 st.session_state["general_config"] = updated_state["general_config"]
                 st.success("Plan loaded. Review values and click Calculate.")
 
-    courses = list_courses(repo_root)
-    course_index = 0
-    for idx, course in enumerate(courses):
-        if course.course_id == st.session_state["general_course_id"]:
-            course_index = idx
+    events = list_curated_events(repo_root)
+    if not events:
+        st.error("No curated events are currently available in the repository.")
+        return
+
+    event_index = 0
+    for idx, event in enumerate(events):
+        if event.event_id == st.session_state["general_event_id"]:
+            event_index = idx
             break
 
-    col_a, col_b = st.columns([3, 2])
-    with col_a:
-        selected_course = st.selectbox(
-            "Course Library",
-            options=courses,
-            index=course_index,
-            format_func=lambda c: f"{c.name} ({c.course_id})",
-            help="Choose a built-in route or any GPX from the local repository library.",
-        )
+    previous_event_id = st.session_state["general_event_id"]
+    selected_event = st.selectbox(
+        "Event",
+        options=events,
+        index=event_index,
+        format_func=lambda event: event.name,
+        help="Choose a curated event. The planner model and course are selected automatically.",
+    )
+    selected_course = get_course_by_id(repo_root, selected_event.course_id)
+    selected_template = get_event_template(selected_event.template_id)
 
-    with col_b:
-        uploaded_gpx = st.file_uploader(
-            "Upload GPX to Local Library",
-            type=["gpx"],
-            key="general_gpx_uploader",
-            help="Uploaded files are stored under courses/uploads and become selectable courses.",
-        )
-        if uploaded_gpx is not None:
-            upload_course = save_uploaded_gpx(
-                uploaded_gpx.name,
-                uploaded_gpx.getvalue(),
-                repo_root / "courses" / "uploads",
-            )
-            st.session_state["general_course_id"] = upload_course.course_id
-            st.success(f"Stored upload as {upload_course.gpx_path.name}. Select it in course list.")
+    if selected_event.event_id != previous_event_id:
+        st.session_state["general_event_id"] = selected_event.event_id
+        st.session_state["general_course_id"] = selected_event.course_id
+        st.session_state["general_config"] = _default_config_for_event(selected_event)
+    else:
+        st.session_state["general_course_id"] = selected_event.course_id
 
-    st.session_state["general_course_id"] = selected_course.course_id
+    st.caption(
+        f"Template: {selected_template.label} | Model: {selected_event.race_model} | Course: {selected_course.gpx_path.name}"
+    )
 
     cfg = st.session_state["general_config"]
-
-    race_model = st.selectbox(
-        "Race Model",
-        options=[
-            "road_marathon",
-            "half_marathon",
-            "fire_road_ultra",
-            "technical_trail_ultra",
-        ],
-        index=["road_marathon", "half_marathon", "fire_road_ultra", "technical_trail_ultra"].index(
-            cfg.get("race_model", "road_marathon")
-        ),
-    )
+    race_model = selected_event.race_model
+    cfg["race_model"] = race_model
 
     input_mode = st.radio(
         "Input Mode",
         options=["finish_time", "effort_anchor"],
-        index=0 if cfg.get("input_mode") == "finish_time" else 1,
+        index=0 if cfg.get("input_mode", selected_event.default_input_mode) == "finish_time" else 1,
         horizontal=True,
         help="Finish-time derives base pace from target finish. Effort-anchor uses your known pace anchor.",
     )

@@ -44,3 +44,24 @@ def test_load_plan_into_state_restores_course_and_config(tmp_path: Path) -> None
     assert error is None
     assert state["general_course_id"] == "semi-marathon-finistere"
     assert state["general_config"]["race_model"] == "technical_trail_ultra"
+
+
+def test_load_plan_into_state_restores_curated_event_id(tmp_path: Path) -> None:
+    course_dir = tmp_path / "semi-marathon-finistere"
+    course_dir.mkdir(parents=True)
+    (course_dir / "semi-marathon-du-finistere.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+
+    payload_json = export_plan_json(
+        course_id="semi-marathon-finistere",
+        gpx_filename="semi-marathon-du-finistere.gpx",
+        config=PacingConfig(race_model="half_marathon", input_mode="finish_time"),
+    )
+
+    state, error = load_plan_into_state(
+        payload_json,
+        tmp_path,
+        {"general_config": {}, "general_course_id": "x", "general_event_id": "y"},
+    )
+
+    assert error is None
+    assert state["general_event_id"] == "semi-marathon-finistere"

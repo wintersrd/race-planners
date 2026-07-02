@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from race_planners.course_library import list_courses, save_uploaded_gpx
+from race_planners.course_library import get_builtin_courses, list_courses, save_uploaded_gpx
 
 
 def test_list_courses_includes_gpx_from_local_library(tmp_path: Path) -> None:
@@ -16,6 +16,27 @@ def test_list_courses_includes_gpx_from_local_library(tmp_path: Path) -> None:
 
     assert any(c.course_id == "semi-marathon-finistere" for c in courses)
     assert any(c.course_id == "library:gr34-test-course" for c in courses)
+
+
+def test_get_builtin_courses_uses_curated_event_catalog(tmp_path: Path) -> None:
+    course_dir = tmp_path / "semi-marathon-finistere"
+    course_dir.mkdir()
+    for filename in [
+        "semi-marathon-du-finistere.gpx",
+        "2026-grf56.gpx",
+        "2026-grf92.gpx",
+        "2026-grf166.gpx",
+    ]:
+        (course_dir / filename).write_text("<gpx></gpx>", encoding="utf-8")
+
+    courses = get_builtin_courses(tmp_path)
+
+    assert [course.course_id for course in courses] == [
+        "semi-marathon-finistere",
+        "grf56",
+        "grf92",
+        "grf166",
+    ]
 
 
 def test_save_uploaded_gpx_avoids_collisions(tmp_path: Path) -> None:

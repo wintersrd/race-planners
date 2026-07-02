@@ -23,6 +23,30 @@ class Course:
     terrain: str = "road"
 
 
+@dataclass(frozen=True)
+class EventTemplate:
+    template_id: str
+    label: str
+    race_model: str
+    terrain: str
+    supports_finish_time: bool = True
+    supports_effort_anchor: bool = True
+
+
+@dataclass(frozen=True)
+class CuratedEvent:
+    event_id: str
+    name: str
+    short_name: str
+    template_id: str
+    course_id: str
+    gpx_relative_path: Path
+    race_model: str
+    terrain: str
+    aid_stops_km: list[float] = field(default_factory=list)
+    default_input_mode: str = "finish_time"
+
+
 @dataclass
 class PacingConfig:
     race_model: str

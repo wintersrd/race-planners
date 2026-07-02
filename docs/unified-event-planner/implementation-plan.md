@@ -1,7 +1,24 @@
 # Unified Event Planner Implementation Plan
 
 Date: 2026-07-02
-Status: Ready for execution
+Status: In progress
+
+## Progress Log
+
+### 2026-07-02
+
+- Completed checkpoint commit of the pre-build groundwork and removed the tracked
+  `semi-marathon-finistere/__pycache__/app.cpython-313.pyc` file from git so
+  `pytest` hook runs stop dirtying the index during commits.
+- Phase 1 completed:
+  - added canonical curated event and event-template models
+  - added repository-backed curated event catalog entries for Finistere,
+    GRF56, GRF92, and GRF166
+  - switched built-in course definitions to derive from the curated event
+    catalog instead of a one-off hardcoded course entry
+  - began event-first planner integration by selecting curated events and
+    automatically deriving course/model defaults in the general planner
+  - added catalog and planner-state test coverage for the new event layer
 
 ## Objective
 

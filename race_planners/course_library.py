@@ -3,20 +3,21 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from race_planners.event_catalog import list_curated_events
 from race_planners.models import Course
 
 
 def get_builtin_courses(repo_root: Path) -> list[Course]:
     """Return built-in course definitions shipped in repository."""
-    course_dir = repo_root / "semi-marathon-finistere"
     return [
         Course(
-            course_id="semi-marathon-finistere",
-            name="Semi-Marathon du Finistere",
-            gpx_path=course_dir / "semi-marathon-du-finistere.gpx",
-            aid_stops_km=[5.3, 9.1, 14.5],
-            terrain="road",
+            course_id=event.course_id,
+            name=event.name,
+            gpx_path=repo_root / event.gpx_relative_path,
+            aid_stops_km=list(event.aid_stops_km),
+            terrain=event.terrain,
         )
+        for event in list_curated_events(repo_root)
     ]
 
 
