@@ -7,76 +7,87 @@ Run with: streamlit run app.py
 
 import math
 import os
+import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import streamlit as st
+from streamlit.runtime.scriptrunner import get_script_run_ctx
 
-from race_planners.streamlit_general import render_general_planner
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(SCRIPT_DIR)
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 
-# =============================================================================
-# PAGE CONFIG
-# =============================================================================
-st.set_page_config(
-    page_title="Half Marathon Race Pacing",
-    page_icon="🏃‍♀️",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+def ensure_streamlit_runtime() -> None:
+    """Re-exec the script through Streamlit when launched directly."""
+    if get_script_run_ctx(suppress_warning=True) is not None:
+        return
 
-# =============================================================================
-# CUSTOM CSS FOR TABS
-# =============================================================================
-st.markdown(
-    """
-<style>
-    /* Make tab headers larger and more pronounced */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-        background-color: #f0f2f6;
-        padding: 10px 10px 0px 10px;
-        border-radius: 10px 10px 0px 0px;
-    }
+    os.execv(
+        sys.executable,
+        [sys.executable, "-m", "streamlit", "run", os.path.abspath(__file__)],
+    )
 
-    .stTabs [data-baseweb="tab"] {
-        font-size: 18px;
-        font-weight: 600;
-        padding: 15px 25px;
-        background-color: #e8eaed;
-        border-radius: 8px 8px 0px 0px;
-        border: 2px solid transparent;
-        transition: all 0.2s ease;
-        color: #555;
-    }
 
-    .stTabs [data-baseweb="tab"]:hover {
-        background-color: #dce3ea;
-        color: #2E86AB;
-    }
+def configure_page() -> None:
+    """Configure page metadata and shared styling once Streamlit is active."""
+    st.set_page_config(
+        page_title="Half Marathon Race Pacing",
+        page_icon="🏃‍♀️",
+        layout="wide",
+        initial_sidebar_state="expanded",
+    )
 
-    .stTabs [aria-selected="true"] {
-        background-color: white !important;
-        border: 2px solid #2E86AB !important;
-        border-bottom: 2px solid white !important;
-        color: #2E86AB !important;
-    }
+    st.markdown(
+        """
+    <style>
+        /* Make tab headers larger and more pronounced */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            background-color: #f0f2f6;
+            padding: 10px 10px 0px 10px;
+            border-radius: 10px 10px 0px 0px;
+        }
 
-    .stTabs [data-baseweb="tab-panel"] {
-        background-color: white;
-        padding: 20px;
-        border: 2px solid #2E86AB;
-        border-top: none;
-        border-radius: 0px 0px 10px 10px;
-    }
-</style>
-""",
-    unsafe_allow_html=True,
-)
+        .stTabs [data-baseweb="tab"] {
+            font-size: 18px;
+            font-weight: 600;
+            padding: 15px 25px;
+            background-color: #e8eaed;
+            border-radius: 8px 8px 0px 0px;
+            border: 2px solid transparent;
+            transition: all 0.2s ease;
+            color: #555;
+        }
+
+        .stTabs [data-baseweb="tab"]:hover {
+            background-color: #dce3ea;
+            color: #2E86AB;
+        }
+
+        .stTabs [aria-selected="true"] {
+            background-color: white !important;
+            border: 2px solid #2E86AB !important;
+            border-bottom: 2px solid white !important;
+            color: #2E86AB !important;
+        }
+
+        .stTabs [data-baseweb="tab-panel"] {
+            background-color: white;
+            padding: 20px;
+            border: 2px solid #2E86AB;
+            border-top: none;
+            border-radius: 0px 0px 10px 10px;
+        }
+    </style>
+    """,
+        unsafe_allow_html=True,
+    )
 
 # =============================================================================
 # TRANSLATIONS DICTIONARY - English/French
@@ -354,7 +365,7 @@ COURSE_SECTIONS = [
 
 REST_STOPS = [5.3, 9.1, 14.5]
 # Use absolute path based on script location for deployment compatibility
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
 GPX_FILE = os.path.join(SCRIPT_DIR, "semi-marathon-du-finistere.gpx")
 SMOOTHING_WINDOW = 5
 
@@ -915,7 +926,7 @@ def calculate_pacing(
     running_time_min = target_finish_time_min - total_rest_time_min
 
     if running_time_min <= 0:
-        raise ValueError(f"Rest time exceeds target finish time")
+        raise ValueError("Rest time exceeds target finish time")
 
     base_gap_pace = running_time_min / gap_adjusted_distance_km
 
@@ -1346,6 +1357,8 @@ def generate_wrist_band(pacing_data: dict, total_distance_km: float) -> str:
 
 
 def main():
+    configure_page()
+
     planner_mode = st.radio(
         "Planner mode",
         options=["legacy_half_marathon", "general_beta"],
@@ -1354,6 +1367,8 @@ def main():
     )
 
     if planner_mode == "general_beta":
+        from race_planners.streamlit_general import render_general_planner
+
         render_general_planner(Path(SCRIPT_DIR).parent)
         return
 
@@ -1440,7 +1455,7 @@ def main():
             max_value=5.0,
             value=2.0,
             step=0.2,
-            help=f"Higher = fewer, more significant segments. Lower = more granular.",
+            help="Higher = fewer, more significant segments. Lower = more granular.",
         )
         min_segment_distance = st.slider(
             f"{t('min_segment', lang)} (m)",
@@ -1448,7 +1463,7 @@ def main():
             max_value=2000,
             value=500,
             step=100,
-            help=f"Minimum distance for a segment. Smaller = more segments.",
+            help="Minimum distance for a segment. Smaller = more segments.",
         )
 
         calculate_button = st.button(
@@ -1950,4 +1965,5 @@ def main():
 
 
 if __name__ == "__main__":
+    ensure_streamlit_runtime()
     main()

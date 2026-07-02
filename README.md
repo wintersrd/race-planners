@@ -26,6 +26,10 @@ Run Streamlit from repository root so path behavior matches Streamlit Community 
 uv run streamlit run semi-marathon-finistere/app.py
 ```
 
+Do not start the app with `uv run semi-marathon-finistere/app.py` as a normal Python script. This repository's app is a Streamlit entrypoint, not a plain CLI program.
+
+If you do run the script directly, it now re-launches itself through Streamlit, but the supported command is still the `streamlit run` form above.
+
 In-app mode switch:
 
 - `Legacy Half Marathon` keeps existing race-specific behavior and output tabs.
