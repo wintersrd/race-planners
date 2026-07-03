@@ -70,18 +70,22 @@ def technical_trail_pace(
     grade_percent: float,
     climb_hike_threshold_percent: float,
     descent_caution: str,
+    hike_grade_percent: float | None = None,
+    descent_grade_percent: float | None = None,
 ) -> float:
+    hike_grade = grade_percent if hike_grade_percent is None else hike_grade_percent
+    descent_grade = grade_percent if descent_grade_percent is None else descent_grade_percent
     uphill_or_flat_gap = flat_pace_min_km * gap_factor(grade_percent)
     pace_after_hike = apply_hike_switch(
         running_pace_min_km=uphill_or_flat_gap,
         hike_pace_min_km=hike_pace_min_km,
-        grade_percent=grade_percent,
+        grade_percent=hike_grade,
         threshold_percent=climb_hike_threshold_percent,
     )
 
-    if grade_percent < 0:
-        pace_after_hike *= technical_descent_multiplier(grade_percent, descent_caution)
-        if grade_percent <= -18:
+    if descent_grade < 0:
+        pace_after_hike *= technical_descent_multiplier(descent_grade, descent_caution)
+        if descent_grade <= -18:
             pace_after_hike = max(pace_after_hike, flat_pace_min_km * 1.05)
 
     return pace_after_hike
@@ -135,9 +139,11 @@ class TechnicalTrailUltraModel:
         return technical_trail_pace(
             flat_pace_min_km=self.flat_pace_min_km,
             hike_pace_min_km=self.hike_pace_min_km,
-            grade_percent=max(context.grade_percent, context.steepest_climb_percent),
+            grade_percent=context.grade_percent,
             climb_hike_threshold_percent=self.hike_threshold_percent,
             descent_caution=self.descent_caution,
+            hike_grade_percent=max(context.grade_percent, context.steepest_climb_percent),
+            descent_grade_percent=min(context.grade_percent, context.steepest_descent_percent),
         )
 
 

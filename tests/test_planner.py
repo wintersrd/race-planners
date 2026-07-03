@@ -235,6 +235,42 @@ def test_hr_guardrail_changes_grf92_finish_time() -> None:
     )
 
 
+def test_descent_caution_changes_grf92_finish_time() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    course = get_course_by_id(repo_root, "grf92")
+    loaded = load_course_trackpoints(course)
+
+    lower_caution = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=8.5,
+            hike_pace_min_km=13.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="low",
+            rpe_target=6.0,
+            hr_cap=155,
+        ),
+    )
+    higher_caution = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=8.5,
+            hike_pace_min_km=13.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="high",
+            rpe_target=6.0,
+            hr_cap=155,
+        ),
+    )
+
+    assert higher_caution.total_time_min > lower_caution.total_time_min
+    assert higher_caution.total_time_min - lower_caution.total_time_min > 1.0
+
+
 def test_segment_summaries_include_elevation_gain_and_loss() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     course = get_course_by_id(repo_root, "semi-marathon-finistere")

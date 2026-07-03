@@ -1,6 +1,7 @@
 from race_planners.pacing import (
     FireRoadUltraModel,
     PacingContext,
+    TechnicalTrailUltraModel,
     technical_descent_multiplier,
     technical_trail_pace,
 )
@@ -47,3 +48,22 @@ def test_technical_very_steep_can_be_slower_than_flat() -> None:
         descent_caution="high",
     )
     assert pace > 8.0
+
+
+def test_technical_trail_model_uses_steepest_descent_for_caution() -> None:
+    model = TechnicalTrailUltraModel(
+        flat_pace_min_km=8.0,
+        hike_pace_min_km=13.0,
+        hike_threshold_percent=12.0,
+        descent_caution="high",
+    )
+    context = PacingContext(
+        grade_percent=-2.0,
+        progress_ratio=0.5,
+        elapsed_hours=4.0,
+        climb_m_per_km=10.0,
+        steepest_climb_percent=3.0,
+        steepest_descent_percent=-19.0,
+    )
+
+    assert model.pace_for_context(context) > 8.0
