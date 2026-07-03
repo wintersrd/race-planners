@@ -1,12 +1,16 @@
 from pathlib import Path
 
 from race_planners.event_catalog import get_curated_event
-from race_planners.models import PacingConfig
+from race_planners.models import PacingConfig, PaceSplit, TrackPoint
 from race_planners.plan_io import export_plan_json
 from race_planners.streamlit_general import (
+    _aggregate_split_rows,
     _course_overview_rows,
     _default_config_for_event,
     _derived_hr_guardrail_cap,
+    _format_clock_time,
+    _format_duration_minutes,
+    _format_pace_minutes,
     load_plan_into_state,
 )
 
@@ -108,7 +112,50 @@ def test_course_overview_rows_reflect_event_metadata(tmp_path: Path) -> None:
     assert rows[0] == {"label": "Distance", "value": "21.06 km"}
     assert any(row == {"label": "Terrain", "value": "Road"} for row in rows)
     assert any(row == {"label": "Aid Stations", "value": "3 configured"} for row in rows)
+    assert any(row == {"label": "Start Time", "value": "Unknown"} for row in rows)
     assert all(row["label"] != "Race Model" for row in rows)
+
+
+def test_time_format_helpers_render_human_readable_values(tmp_path: Path) -> None:
+    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
+    (tmp_path / "semi-marathon-finistere" / "2026-grf92.gpx").write_text(
+        "<gpx></gpx>", encoding="utf-8"
+    )
+    event = get_curated_event(tmp_path, "grf92")
+
+    assert _format_pace_minutes(4.5) == "4:30"
+    assert _format_duration_minutes(88.5) == "1:28:30"
+    assert _format_duration_minutes(4.5) == "4:30"
+    assert _format_clock_time(event, 88.5) == "7:58 AM"
+
+
+def test_aggregate_split_rows_supports_multi_kilometer_blocks(tmp_path: Path) -> None:
+    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
+    (tmp_path / "semi-marathon-finistere" / "2026-grf92.gpx").write_text(
+        "<gpx></gpx>", encoding="utf-8"
+    )
+    event = get_curated_event(tmp_path, "grf92")
+    rows = _aggregate_split_rows(
+        splits=[
+            PaceSplit(1.0, 5.0, 2.0, 5.0, 5.0),
+            PaceSplit(2.0, 7.0, 4.0, 7.0, 12.0),
+            PaceSplit(3.0, 6.0, -1.0, 6.0, 18.0),
+        ],
+        trackpoints=[
+            TrackPoint(48.0, -4.0, 0.0, "", 0.0),
+            TrackPoint(48.0, -3.99, 10.0, "", 1000.0),
+            TrackPoint(48.0, -3.98, 25.0, "", 2000.0),
+            TrackPoint(48.0, -3.97, 20.0, "", 3000.0),
+        ],
+        event=event,
+        block_size_km=2,
+    )
+
+    assert len(rows) == 2
+    assert rows[0]["split"] == "0.0-2.0 km"
+    assert rows[0]["pace"] == "6:00"
+    assert rows[0]["elev_gain_m"] == 25.0
+    assert rows[1]["split"] == "2.0-3.0 km"
 
 
 def test_default_config_for_trail_event_uses_athlete_profile_defaults(tmp_path: Path) -> None:
@@ -165,3 +212,16 @@ def test_derived_hr_guardrail_cap_uses_profile_and_policy() -> None:
     )
 
     assert guardrail == 153
+
+
+def test_derived_hr_guardrail_cap_varies_by_event_type() -> None:
+    profile = {"lt1_hr": 152, "lt2_hr": 170}
+
+    technical = _derived_hr_guardrail_cap(profile, "technical_trail_ultra", "steady")
+    fire_road = _derived_hr_guardrail_cap(profile, "fire_road_ultra", "steady")
+    road = _derived_hr_guardrail_cap(profile, "road_marathon", "steady")
+
+    assert technical is not None
+    assert fire_road is not None
+    assert road is not None
+    assert technical < fire_road < road

@@ -140,8 +140,8 @@ def test_fade_profile_presets_change_trail_finish_time() -> None:
         PacingConfig(
             race_model="technical_trail_ultra",
             input_mode="effort_anchor",
-            flat_pace_min_km=8.5,
-            hike_pace_min_km=13.0,
+            flat_pace_min_km=6.2,
+            hike_pace_min_km=10.5,
             climb_hike_threshold_percent=12.0,
             descent_caution="medium",
             fade_profile_preset="stable",
@@ -152,8 +152,8 @@ def test_fade_profile_presets_change_trail_finish_time() -> None:
         PacingConfig(
             race_model="technical_trail_ultra",
             input_mode="effort_anchor",
-            flat_pace_min_km=8.5,
-            hike_pace_min_km=13.0,
+            flat_pace_min_km=6.2,
+            hike_pace_min_km=10.5,
             climb_hike_threshold_percent=12.0,
             descent_caution="medium",
             fade_profile_preset="blow_up_risk",
@@ -174,8 +174,8 @@ def test_climb_hike_threshold_meaningfully_changes_grf92_finish_time() -> None:
         PacingConfig(
             race_model="technical_trail_ultra",
             input_mode="effort_anchor",
-            flat_pace_min_km=8.5,
-            hike_pace_min_km=13.0,
+            flat_pace_min_km=6.2,
+            hike_pace_min_km=10.5,
             climb_hike_threshold_percent=5.0,
             descent_caution="medium",
         ),
@@ -185,8 +185,8 @@ def test_climb_hike_threshold_meaningfully_changes_grf92_finish_time() -> None:
         PacingConfig(
             race_model="technical_trail_ultra",
             input_mode="effort_anchor",
-            flat_pace_min_km=8.5,
-            hike_pace_min_km=13.0,
+            flat_pace_min_km=6.2,
+            hike_pace_min_km=10.5,
             climb_hike_threshold_percent=15.0,
             descent_caution="medium",
         ),
@@ -206,8 +206,8 @@ def test_effort_policy_changes_grf92_finish_time() -> None:
         PacingConfig(
             race_model="technical_trail_ultra",
             input_mode="effort_anchor",
-            flat_pace_min_km=8.5,
-            hike_pace_min_km=13.0,
+            flat_pace_min_km=6.2,
+            hike_pace_min_km=10.5,
             climb_hike_threshold_percent=12.0,
             descent_caution="medium",
             effort_policy="conservative",
@@ -219,8 +219,8 @@ def test_effort_policy_changes_grf92_finish_time() -> None:
         PacingConfig(
             race_model="technical_trail_ultra",
             input_mode="effort_anchor",
-            flat_pace_min_km=8.5,
-            hike_pace_min_km=13.0,
+            flat_pace_min_km=6.2,
+            hike_pace_min_km=10.5,
             climb_hike_threshold_percent=12.0,
             descent_caution="medium",
             effort_policy="aggressive",
@@ -250,6 +250,12 @@ def test_hr_guardrail_changes_grf92_finish_time() -> None:
             climb_hike_threshold_percent=12.0,
             descent_caution="medium",
             use_hr_guardrail=True,
+            athlete_lt1_hr=152,
+            athlete_lt2_hr=170,
+            athlete_lt1_pace_min_km=5.0,
+            athlete_lt2_pace_min_km=4.25,
+            athlete_flat_trail_slowdown_sec_km=25.0,
+            athlete_technical_trail_slowdown_sec_km=45.0,
             hr_cap=130,
         ),
     )
@@ -263,6 +269,12 @@ def test_hr_guardrail_changes_grf92_finish_time() -> None:
             climb_hike_threshold_percent=12.0,
             descent_caution="medium",
             use_hr_guardrail=True,
+            athlete_lt1_hr=152,
+            athlete_lt2_hr=170,
+            athlete_lt1_pace_min_km=5.0,
+            athlete_lt2_pace_min_km=4.25,
+            athlete_flat_trail_slowdown_sec_km=25.0,
+            athlete_technical_trail_slowdown_sec_km=45.0,
             hr_cap=180,
         ),
     )
@@ -272,6 +284,58 @@ def test_hr_guardrail_changes_grf92_finish_time() -> None:
         "Derived HR guardrail tempers pacing on steeper or later-course segments."
         in lower_cap.assumptions
     )
+    assert any(
+        "Derived HR strategy targets roughly" in assumption for assumption in lower_cap.assumptions
+    )
+
+
+def test_hr_guardrail_uses_profile_pace_relationships() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    course = get_course_by_id(repo_root, "grf92")
+    loaded = load_course_trackpoints(course)
+
+    lower_technical_tax = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=6.2,
+            hike_pace_min_km=10.5,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            effort_policy="steady",
+            use_hr_guardrail=True,
+            athlete_lt1_hr=152,
+            athlete_lt2_hr=170,
+            athlete_lt1_pace_min_km=5.0,
+            athlete_lt2_pace_min_km=4.25,
+            athlete_flat_trail_slowdown_sec_km=20.0,
+            athlete_technical_trail_slowdown_sec_km=20.0,
+            hr_cap=156,
+        ),
+    )
+    higher_technical_tax = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=6.2,
+            hike_pace_min_km=10.5,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            effort_policy="steady",
+            use_hr_guardrail=True,
+            athlete_lt1_hr=152,
+            athlete_lt2_hr=170,
+            athlete_lt1_pace_min_km=5.0,
+            athlete_lt2_pace_min_km=4.25,
+            athlete_flat_trail_slowdown_sec_km=20.0,
+            athlete_technical_trail_slowdown_sec_km=60.0,
+            hr_cap=156,
+        ),
+    )
+
+    assert higher_technical_tax.total_time_min > lower_technical_tax.total_time_min
 
 
 def test_descent_caution_changes_grf92_finish_time() -> None:

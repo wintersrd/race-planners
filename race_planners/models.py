@@ -68,6 +68,7 @@ class CuratedEvent:
     terrain: str
     aid_stops_km: list[float] = field(default_factory=list)
     default_input_mode: str = "finish_time"
+    start_time_local: str | None = None
 
 
 @dataclass
@@ -103,6 +104,12 @@ class PacingConfig:
     fade_late_bias: float | None = None
     effort_policy: str | None = None
     use_hr_guardrail: bool = False
+    athlete_lt1_hr: int | None = None
+    athlete_lt2_hr: int | None = None
+    athlete_lt1_pace_min_km: float | None = None
+    athlete_lt2_pace_min_km: float | None = None
+    athlete_flat_trail_slowdown_sec_km: float | None = None
+    athlete_technical_trail_slowdown_sec_km: float | None = None
     rpe_target: float | None = None
     hr_cap: int | None = None
 

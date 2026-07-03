@@ -72,6 +72,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             gpx_relative_path=Path("semi-marathon-finistere/2026-grf56.gpx"),
             race_model="technical_trail_ultra",
             terrain="trail",
+            start_time_local="12:30",
         ),
         CuratedEvent(
             event_id="grf92",
@@ -82,6 +83,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             gpx_relative_path=Path("semi-marathon-finistere/2026-grf92.gpx"),
             race_model="technical_trail_ultra",
             terrain="trail",
+            start_time_local="06:30",
         ),
         CuratedEvent(
             event_id="grf166",
@@ -92,6 +94,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             gpx_relative_path=Path("semi-marathon-finistere/2026-grf166.gpx"),
             race_model="technical_trail_ultra",
             terrain="trail",
+            start_time_local="17:00",
         ),
         CuratedEvent(
             event_id="marathon-etoiles-baie",
@@ -102,6 +105,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             gpx_relative_path=Path("semi-marathon-finistere/marathon-des-etoiles-de-la-baie.gpx"),
             race_model="road_marathon",
             terrain="road",
+            start_time_local="09:00",
         ),
         CuratedEvent(
             event_id="trail-odet-ultra",
@@ -112,6 +116,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             gpx_relative_path=Path("semi-marathon-finistere/trail-de-l-odet-ultra.gpx"),
             race_model="technical_trail_ultra",
             terrain="trail",
+            start_time_local="11:00",
         ),
     )
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,7 @@ from race_planners.event_catalog import (
     list_curated_events,
 )
 from race_planners.grade import elevation_changes
-from race_planners.models import AthleteProfile, CuratedEvent, PacingConfig
+from race_planners.models import AthleteProfile, CuratedEvent, PaceSplit, PacingConfig, TrackPoint
 from race_planners.plan_io import (
     ensure_gpx_exists_for_plan,
     export_plan_json,
@@ -35,7 +36,158 @@ def _course_overview_rows(total_distance_km: float, event: CuratedEvent) -> list
         {"label": "Distance", "value": f"{total_distance_km:.2f} km"},
         {"label": "Terrain", "value": event.terrain.title()},
         {"label": "Aid Stations", "value": aid_mode},
+        {
+            "label": "Start Time",
+            "value": _format_clock_time(event, 0.0)
+            if event.start_time_local is not None
+            else "Unknown",
+        },
     ]
+
+
+def _format_pace_minutes(minutes: float | None) -> str:
+    if minutes is None:
+        return "-"
+    total_seconds = max(int(round(minutes * 60)), 0)
+    mins, secs = divmod(total_seconds, 60)
+    return f"{mins}:{secs:02d}"
+
+
+def _format_duration_minutes(minutes: float | None) -> str:
+    if minutes is None:
+        return "-"
+    total_seconds = max(int(round(minutes * 60)), 0)
+    hours, remainder = divmod(total_seconds, 3600)
+    mins, secs = divmod(remainder, 60)
+    if hours > 0:
+        return f"{hours}:{mins:02d}:{secs:02d}"
+    return f"{mins}:{secs:02d}"
+
+
+def _start_datetime(event: CuratedEvent) -> datetime | None:
+    if event.start_time_local is None:
+        return None
+    return datetime.strptime(event.start_time_local, "%H:%M")
+
+
+def _format_clock_time(event: CuratedEvent, elapsed_minutes: float | None) -> str:
+    if elapsed_minutes is None:
+        return "-"
+    start_dt = _start_datetime(event)
+    if start_dt is None:
+        return "-"
+    clock_dt = start_dt + timedelta(minutes=elapsed_minutes)
+    hour_12 = clock_dt.hour % 12 or 12
+    suffix = "AM" if clock_dt.hour < 12 else "PM"
+    return f"{hour_12}:{clock_dt.minute:02d} {suffix}"
+
+
+def _split_block_options(total_distance_km: float) -> list[int]:
+    options = [1, 2, 5, 10]
+    return [option for option in options if option < total_distance_km or option == 1]
+
+
+def _default_split_block_size(total_distance_km: float) -> int:
+    if total_distance_km > 120:
+        return 10
+    if total_distance_km > 60:
+        return 5
+    if total_distance_km > 25:
+        return 2
+    return 1
+
+
+def _split_piece_rows(splits: list[PaceSplit]) -> list[dict[str, float]]:
+    rows: list[dict[str, float]] = []
+    prev_end_km = 0.0
+    for split in splits:
+        start_km = prev_end_km
+        end_km = split.km
+        if end_km <= start_km:
+            continue
+        rows.append(
+            {
+                "start_km": start_km,
+                "end_km": end_km,
+                "start_elapsed": split.cumulative_time_min - split.segment_time_min,
+                "end_elapsed": split.cumulative_time_min,
+                "segment_time": split.segment_time_min,
+                "grade": split.grade_percent,
+            }
+        )
+        prev_end_km = end_km
+    return rows
+
+
+def _elapsed_at_distance(split_pieces: list[dict[str, float]], distance_km: float) -> float:
+    if distance_km <= 0:
+        return 0.0
+    for piece in split_pieces:
+        if distance_km <= piece["end_km"]:
+            piece_distance = piece["end_km"] - piece["start_km"]
+            if piece_distance <= 0:
+                return piece["end_elapsed"]
+            fraction = (distance_km - piece["start_km"]) / piece_distance
+            return piece["start_elapsed"] + (piece["segment_time"] * fraction)
+    return split_pieces[-1]["end_elapsed"] if split_pieces else 0.0
+
+
+def _aggregate_split_rows(
+    splits: list[PaceSplit],
+    trackpoints: list[TrackPoint],
+    event: CuratedEvent,
+    block_size_km: int,
+) -> list[dict[str, Any]]:
+    if not splits:
+        return []
+
+    split_pieces = _split_piece_rows(splits)
+    total_distance_km = splits[-1].km
+    rows: list[dict[str, Any]] = []
+    block_start_km = 0.0
+
+    while block_start_km < total_distance_km - 0.001:
+        block_end_km = min(block_start_km + block_size_km, total_distance_km)
+        block_distance_km = block_end_km - block_start_km
+        block_time_min = 0.0
+        weighted_grade = 0.0
+
+        for piece in split_pieces:
+            overlap_start_km = max(piece["start_km"], block_start_km)
+            overlap_end_km = min(piece["end_km"], block_end_km)
+            overlap_distance_km = overlap_end_km - overlap_start_km
+            piece_distance_km = piece["end_km"] - piece["start_km"]
+            if overlap_distance_km <= 0 or piece_distance_km <= 0:
+                continue
+
+            overlap_time_min = piece["segment_time"] * (overlap_distance_km / piece_distance_km)
+            block_time_min += overlap_time_min
+            weighted_grade += piece["grade"] * overlap_distance_km
+
+        start_elapsed_min = _elapsed_at_distance(split_pieces, block_start_km)
+        end_elapsed_min = _elapsed_at_distance(split_pieces, block_end_km)
+        elev_gain_m, elev_loss_m = elevation_changes(
+            trackpoints,
+            block_start_km * 1000,
+            block_end_km * 1000,
+        )
+        rows.append(
+            {
+                "split": f"{block_start_km:.1f}-{block_end_km:.1f} km",
+                "distance_km": round(block_distance_km, 2),
+                "pace": _format_pace_minutes(block_time_min / block_distance_km),
+                "grade": round(weighted_grade / block_distance_km, 2),
+                "elev_gain_m": round(elev_gain_m, 1),
+                "elev_loss_m": round(elev_loss_m, 1),
+                "split_time": _format_duration_minutes(block_time_min),
+                "elapsed": _format_duration_minutes(end_elapsed_min),
+                "clock": _format_clock_time(event, end_elapsed_min),
+                "start_elapsed": _format_duration_minutes(start_elapsed_min),
+            }
+        )
+        block_start_km = block_end_km
+
+    return rows
 
 
 FADE_PROFILE_PRESETS: dict[str, tuple[str, tuple[float, float, float]]] = {
@@ -747,6 +899,14 @@ def render_general_planner(repo_root: Path) -> None:
         fade_late_bias=None if _is_road_event(selected_event) else fade_late_bias,
         effort_policy=None if _is_road_event(selected_event) else effort_policy,
         use_hr_guardrail=False if _is_road_event(selected_event) else use_hr_guardrail,
+        athlete_lt1_hr=athlete_profile.get("lt1_hr"),
+        athlete_lt2_hr=athlete_profile.get("lt2_hr"),
+        athlete_lt1_pace_min_km=athlete_profile.get("lt1_pace_min_km"),
+        athlete_lt2_pace_min_km=athlete_profile.get("lt2_pace_min_km"),
+        athlete_flat_trail_slowdown_sec_km=athlete_profile.get("flat_trail_slowdown_sec_km"),
+        athlete_technical_trail_slowdown_sec_km=athlete_profile.get(
+            "technical_trail_slowdown_sec_km"
+        ),
         rpe_target=(
             None if _is_road_event(selected_event) else EFFORT_POLICY_PRESETS[effort_policy][1]
         ),
@@ -767,11 +927,17 @@ def render_general_planner(repo_root: Path) -> None:
         chosen_course = st.session_state["general_selected_course"]
         loaded_course = st.session_state.get("general_loaded_course", overview_course)
         st.subheader("Plan Output")
-        summary_a, summary_b, summary_c, summary_d = st.columns(4)
+        average_pace_min_km = (
+            result.moving_time_min / result.total_distance_km
+            if result.total_distance_km > 0
+            else None
+        )
+        summary_a, summary_b, summary_c, summary_d, summary_e = st.columns(5)
         summary_a.metric("Distance", f"{result.total_distance_km:.2f} km")
-        summary_b.metric("Elapsed", f"{result.total_time_min:.1f} min")
-        summary_c.metric("Moving", f"{result.moving_time_min:.1f} min")
-        summary_d.metric("Rest", f"{result.total_rest_time_min:.1f} min")
+        summary_b.metric("Elapsed", _format_duration_minutes(result.total_time_min))
+        summary_c.metric("Moving", _format_duration_minutes(result.moving_time_min))
+        summary_d.metric("Rest", _format_duration_minutes(result.total_rest_time_min))
+        summary_e.metric("Avg Pace", _format_pace_minutes(average_pace_min_km))
         if result.assumptions:
             st.caption("Assumptions: " + " | ".join(result.assumptions))
         if result.warnings:
@@ -790,6 +956,10 @@ def render_general_planner(repo_root: Path) -> None:
                         {"Metric": "Elevation Gain", "Value": f"+{total_gain_m:.0f}m"},
                         {"Metric": "Elevation Loss", "Value": f"-{total_loss_m:.0f}m"},
                         {"Metric": "Aid Stations", "Value": str(len(result.aid_station_etas))},
+                        {
+                            "Metric": "Estimated Finish",
+                            "Value": _format_clock_time(selected_event, result.total_time_min),
+                        },
                     ]
                 ),
                 width="stretch",
@@ -808,11 +978,23 @@ def render_general_planner(repo_root: Path) -> None:
                         {
                             "label": aid_eta.label or f"Aid {idx + 1}",
                             "distance_km": round(aid_eta.distance_km, 2),
-                            "arrival_elapsed_min": round(aid_eta.arrival_elapsed_time_min, 2),
-                            "departure_elapsed_min": round(aid_eta.departure_elapsed_time_min, 2),
-                            "split_min": round(aid_eta.split_from_prev_min, 2),
-                            "split_pace": round(aid_eta.actual_pace_min_km, 2),
-                            "rest_min": round(aid_eta.suggested_rest_min, 2),
+                            "arrival_elapsed": _format_duration_minutes(
+                                aid_eta.arrival_elapsed_time_min
+                            ),
+                            "arrival_clock": _format_clock_time(
+                                selected_event,
+                                aid_eta.arrival_elapsed_time_min,
+                            ),
+                            "departure_elapsed": _format_duration_minutes(
+                                aid_eta.departure_elapsed_time_min
+                            ),
+                            "departure_clock": _format_clock_time(
+                                selected_event,
+                                aid_eta.departure_elapsed_time_min,
+                            ),
+                            "split_time": _format_duration_minutes(aid_eta.split_from_prev_min),
+                            "split_pace": _format_pace_minutes(aid_eta.actual_pace_min_km),
+                            "rest_time": _format_duration_minutes(aid_eta.suggested_rest_min),
                             "source": aid_eta.source,
                         }
                         for idx, aid_eta in enumerate(result.aid_station_etas)
@@ -836,11 +1018,13 @@ def render_general_planner(repo_root: Path) -> None:
                         "distance_km": round(segment.distance_km, 2),
                         "elev_gain_m": round(segment.elevation_gain_m, 1),
                         "elev_loss_m": round(segment.elevation_loss_m, 1),
-                        "start_min": round(segment.start_time_min, 2),
-                        "end_min": round(segment.end_time_min, 2),
+                        "start_elapsed": _format_duration_minutes(segment.start_time_min),
+                        "end_elapsed": _format_duration_minutes(segment.end_time_min),
+                        "start_clock": _format_clock_time(selected_event, segment.start_time_min),
+                        "end_clock": _format_clock_time(selected_event, segment.end_time_min),
                         "avg_grade": round(segment.avg_grade_percent, 2),
-                        "avg_pace": round(segment.avg_pace_min_km, 2),
-                        "segment_min": round(segment.segment_time_min, 2),
+                        "avg_pace": _format_pace_minutes(segment.avg_pace_min_km),
+                        "segment_time": _format_duration_minutes(segment.segment_time_min),
                     }
                     for segment in result.segments
                 ],
@@ -849,18 +1033,23 @@ def render_general_planner(repo_root: Path) -> None:
             )
 
         with tab_splits:
-            st.markdown("#### Kilometer pacing")
+            split_block_options = _split_block_options(result.total_distance_km)
+            default_split_block = _default_split_block_size(result.total_distance_km)
+            block_index = split_block_options.index(default_split_block)
+            split_block_km = st.selectbox(
+                "Split block size (km)",
+                options=split_block_options,
+                index=block_index,
+                help="Use larger blocks for longer events so pacing is easier to reason about.",
+            )
+            st.markdown("#### Split pacing")
             st.dataframe(
-                [
-                    {
-                        "km": split.km,
-                        "pace": round(split.actual_pace_min_km, 2),
-                        "grade": round(split.grade_percent, 2),
-                        "segment_min": round(split.segment_time_min, 2),
-                        "cum_min": round(split.cumulative_time_min, 2),
-                    }
-                    for split in result.splits
-                ],
+                _aggregate_split_rows(
+                    result.splits,
+                    loaded_course.trackpoints,
+                    selected_event,
+                    split_block_km,
+                ),
                 width="stretch",
                 hide_index=True,
             )

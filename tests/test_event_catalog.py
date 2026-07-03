@@ -60,8 +60,10 @@ def test_get_curated_event_returns_new_marathon_and_ultra_metadata(tmp_path: Pat
 
     assert marathon_event.template_id == "road_marathon"
     assert marathon_event.race_model == "road_marathon"
+    assert marathon_event.start_time_local == "09:00"
     assert ultra_event.template_id == "trail_ultra"
     assert ultra_event.race_model == "technical_trail_ultra"
+    assert ultra_event.start_time_local == "11:00"
 
 
 def test_builtin_course_preserves_event_and_template_metadata(tmp_path: Path) -> None:
