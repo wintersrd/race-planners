@@ -12,11 +12,10 @@ from matplotlib.figure import Figure
 from race_planners.course_library import get_course_by_id
 from race_planners.event_catalog import (
     get_curated_event_by_course_id,
-    get_event_template,
     list_curated_events,
 )
 from race_planners.grade import elevation_changes
-from race_planners.models import CuratedEvent, PacingConfig
+from race_planners.models import AthleteProfile, CuratedEvent, PacingConfig
 from race_planners.plan_io import (
     ensure_gpx_exists_for_plan,
     export_plan_json,
@@ -26,13 +25,87 @@ from race_planners.planner import calculate_plan, load_course_trackpoints
 
 
 def _course_overview_rows(total_distance_km: float, event: CuratedEvent) -> list[dict[str, str]]:
-    aid_mode = "Configured" if event.aid_stops_km else "From GPX"
+    aid_mode = (
+        f"{len(event.aid_stops_km)} configured"
+        if event.aid_stops_km
+        else "Derived from course file"
+    )
     return [
         {"label": "Distance", "value": f"{total_distance_km:.2f} km"},
         {"label": "Terrain", "value": event.terrain.title()},
-        {"label": "Race Model", "value": event.race_model},
         {"label": "Aid Stations", "value": aid_mode},
     ]
+
+
+FADE_PROFILE_PRESETS: dict[str, tuple[str, tuple[float, float, float]]] = {
+    "stable": ("Stable", (0.0, 0.75, 1.5)),
+    "late_fade": ("Late Fade", (0.0, 1.25, 3.5)),
+    "progressive_fade": ("Progressive Fade", (0.5, 2.0, 4.5)),
+    "blow_up_risk": ("Blow-Up Risk", (1.5, 4.0, 7.0)),
+}
+
+
+def _default_athlete_profile() -> dict[str, Any]:
+    return asdict(AthleteProfile())
+
+
+def _is_road_event(event: CuratedEvent) -> bool:
+    return event.race_model in {"half_marathon", "road_marathon"}
+
+
+def _is_trail_event(event: CuratedEvent) -> bool:
+    return not _is_road_event(event)
+
+
+def _profile_text(profile: dict[str, Any], key: str) -> str:
+    value = profile.get(key)
+    return "" if value is None else str(value)
+
+
+def _parse_optional_number(raw_value: str) -> float | None:
+    stripped = raw_value.strip()
+    if not stripped:
+        return None
+    try:
+        return float(stripped)
+    except ValueError:
+        return None
+
+
+def _fade_profile_values(config: dict[str, Any]) -> tuple[float, float, float]:
+    if all(
+        config.get(key) is not None
+        for key in ("fade_early_bias", "fade_mid_bias", "fade_late_bias")
+    ):
+        return (
+            float(config.get("fade_early_bias") or 0.0),
+            float(config.get("fade_mid_bias") or 0.0),
+            float(config.get("fade_late_bias") or 0.0),
+        )
+
+    preset_key = str(config.get("fade_profile_preset") or "stable")
+    return FADE_PROFILE_PRESETS.get(preset_key, FADE_PROFILE_PRESETS["stable"])[1]
+
+
+def _trail_anchor_defaults_from_profile(
+    athlete_profile: dict[str, Any], race_model: str
+) -> tuple[float | None, float | None]:
+    lt1_pace_min_km = athlete_profile.get("lt1_pace_min_km")
+    if lt1_pace_min_km is None:
+        return None, None
+
+    slowdown_key = (
+        "technical_trail_slowdown_sec_km"
+        if race_model == "technical_trail_ultra"
+        else "flat_trail_slowdown_sec_km"
+    )
+    slowdown_sec = athlete_profile.get(slowdown_key)
+    if slowdown_sec is None and race_model == "technical_trail_ultra":
+        slowdown_sec = athlete_profile.get("flat_trail_slowdown_sec_km")
+
+    flat_pace_min_km = float(lt1_pace_min_km) + (float(slowdown_sec or 0.0) / 60.0)
+    hike_pace_min_km = flat_pace_min_km + 4.0
+    return round(flat_pace_min_km, 2), round(hike_pace_min_km, 2)
 
 
 def _plot_course_profile(trackpoints: list[Any], aid_distances_km: list[float]) -> Figure:
@@ -79,25 +152,44 @@ def _default_config() -> dict[str, Any]:
         "descent_caution": "medium",
         "rest_duration_sec": 30,
         "pacing_bias": 0.0,
+        "fade_profile_preset": "stable",
+        "fade_early_bias": None,
+        "fade_mid_bias": None,
+        "fade_late_bias": None,
         "rpe_target": None,
         "hr_cap": None,
     }
 
 
-def _default_config_for_event(event: CuratedEvent) -> dict[str, Any]:
+def _default_config_for_event(
+    event: CuratedEvent, athlete_profile: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    athlete_profile = athlete_profile or {}
     config = _default_config()
     config["race_model"] = event.race_model
     config["input_mode"] = event.default_input_mode
 
     if event.race_model == "half_marathon":
         config["target_finish_time_min"] = 105.0
+        config["rest_duration_sec"] = 10
     elif event.race_model == "road_marathon":
         config["target_finish_time_min"] = 240.0
+        config["rest_duration_sec"] = 15
     else:
         config["input_mode"] = "effort_anchor"
         config["target_finish_time_min"] = None
-        config["flat_pace_min_km"] = 8.5
-        config["hike_pace_min_km"] = 13.0
+        config["rest_duration_sec"] = 180
+        config["fade_profile_preset"] = "progressive_fade"
+        if event.race_model == "fire_road_ultra":
+            config["z1_pace_min_km"] = athlete_profile.get("lt1_pace_min_km") or 8.0
+            config["z2_pace_min_km"] = athlete_profile.get("lt2_pace_min_km") or 7.0
+            config["hike_pace_min_km"] = 12.0
+        else:
+            flat_pace_min_km, hike_pace_min_km = _trail_anchor_defaults_from_profile(
+                athlete_profile, event.race_model
+            )
+            config["flat_pace_min_km"] = flat_pace_min_km or 8.5
+            config["hike_pace_min_km"] = hike_pace_min_km or 13.0
 
     return config
 
@@ -120,6 +212,8 @@ def load_plan_into_state(
     updated_state = dict(current_state)
     updated_state["general_course_id"] = str(payload["course_id"])
     updated_state["general_config"] = dict(payload["config"])
+    if "athlete_profile" in payload:
+        updated_state["general_athlete_profile"] = dict(payload["athlete_profile"])
     matched_event = get_curated_event_by_course_id(repo_root, str(payload["course_id"]))
     if matched_event is not None:
         updated_state["general_event_id"] = matched_event.event_id
@@ -131,6 +225,7 @@ def render_general_planner(repo_root: Path) -> None:
     st.caption("Choose a curated event and plan it through one event-first pacing flow.")
 
     st.session_state.setdefault("general_config", _default_config())
+    st.session_state.setdefault("general_athlete_profile", _default_athlete_profile())
     st.session_state.setdefault("general_event_id", "semi-marathon-finistere")
     st.session_state.setdefault("general_course_id", "semi-marathon-finistere")
 
@@ -146,36 +241,12 @@ def render_general_planner(repo_root: Path) -> None:
             break
 
     previous_event_id = st.session_state["general_event_id"]
-    selected_event = st.selectbox(
-        "Event",
-        options=events,
-        index=event_index,
-        format_func=lambda event: event.name,
-        help="Choose a curated event. The planner model and course are selected automatically.",
-    )
-    selected_course = get_course_by_id(repo_root, selected_event.course_id)
-    selected_template = get_event_template(selected_event.template_id)
+    selected_event: CuratedEvent
 
-    if selected_event.event_id != previous_event_id:
-        st.session_state["general_event_id"] = selected_event.event_id
-        st.session_state["general_course_id"] = selected_event.course_id
-        st.session_state["general_config"] = _default_config_for_event(selected_event)
-        st.session_state.pop("general_result", None)
-        st.session_state.pop("general_selected_course", None)
-        st.session_state.pop("general_loaded_course", None)
-    else:
-        st.session_state["general_course_id"] = selected_event.course_id
-
-    overview_course = load_course_trackpoints(selected_course)
-    total_gain_m, total_loss_m = elevation_changes(
-        overview_course.trackpoints,
-        0.0,
-        overview_course.total_distance_km * 1000,
-    )
-
+    selected_course: Any | None = None
     cfg = st.session_state["general_config"]
-    race_model = selected_event.race_model
-    cfg["race_model"] = race_model
+    athlete_profile = dict(st.session_state["general_athlete_profile"])
+    race_model = ""
 
     target_finish_time_min: float | None = None
     marathon_pace_min_km: float | None = None
@@ -183,6 +254,12 @@ def render_general_planner(repo_root: Path) -> None:
     z2_pace_min_km: float | None = None
     flat_pace_min_km: float | None = None
     hike_pace_min_km: float | None = None
+    climb_hike_threshold_percent = float(cfg.get("climb_hike_threshold_percent", 12.0))
+    descent_caution = str(cfg.get("descent_caution", "medium"))
+    pacing_bias = float(cfg.get("pacing_bias", 0.0))
+    fade_profile_preset = str(cfg.get("fade_profile_preset") or "stable")
+    fade_early_bias, fade_mid_bias, fade_late_bias = _fade_profile_values(cfg)
+    rest_duration_sec = int(cfg.get("rest_duration_sec", 30))
 
     with st.sidebar:
         st.header("Planner Controls")
@@ -202,23 +279,58 @@ def render_general_planner(repo_root: Path) -> None:
                 else:
                     st.session_state["general_course_id"] = updated_state["general_course_id"]
                     st.session_state["general_config"] = updated_state["general_config"]
+                    if "general_event_id" in updated_state:
+                        st.session_state["general_event_id"] = updated_state["general_event_id"]
+                    if "general_athlete_profile" in updated_state:
+                        st.session_state["general_athlete_profile"] = updated_state[
+                            "general_athlete_profile"
+                        ]
                     st.success("Plan loaded. Review values and click Calculate.")
+                    cfg = st.session_state["general_config"]
+                    athlete_profile = dict(st.session_state["general_athlete_profile"])
+
+        selected_event = st.selectbox(
+            "Event",
+            options=events,
+            index=event_index,
+            format_func=lambda event: event.name,
+            help="Choose a curated event. The planner model and course are selected automatically.",
+        )
+
+        selected_course = get_course_by_id(repo_root, selected_event.course_id)
+        if selected_event.event_id != previous_event_id:
+            st.session_state["general_event_id"] = selected_event.event_id
+            st.session_state["general_course_id"] = selected_event.course_id
+            st.session_state["general_config"] = _default_config_for_event(
+                selected_event,
+                athlete_profile,
+            )
+            st.session_state.pop("general_result", None)
+            st.session_state.pop("general_selected_course", None)
+            st.session_state.pop("general_loaded_course", None)
+            cfg = st.session_state["general_config"]
+        else:
+            st.session_state["general_course_id"] = selected_event.course_id
+
+        race_model = selected_event.race_model
+        cfg["race_model"] = race_model
 
         st.markdown("### Event Setup")
         st.caption(
-            f"Template: {selected_template.label} | Model: {selected_event.race_model} | Course: {selected_course.gpx_path.name}"
+            "Road events focus on target pace and split shape. Trail and ultra events focus on terrain handling, fade, and aid-station time."
         )
 
         input_mode = st.radio(
-            "Input Mode",
+            "Target Mode",
             options=["finish_time", "effort_anchor"],
             index=0
             if cfg.get("input_mode", selected_event.default_input_mode) == "finish_time"
             else 1,
-            help="Finish-time derives base pace from target finish. Effort-anchor uses your known pace anchor.",
+            format_func=lambda mode: "Finish Time" if mode == "finish_time" else "Effort Anchor",
+            help="Finish time derives a base plan from your goal time. Effort anchor uses your known pace anchor.",
         )
 
-        if race_model in {"road_marathon", "half_marathon"}:
+        if _is_road_event(selected_event):
             if input_mode == "finish_time":
                 target_finish_time_min = st.number_input(
                     "Target Finish Time (minutes)",
@@ -229,11 +341,12 @@ def render_general_planner(repo_root: Path) -> None:
                 )
             else:
                 marathon_pace_min_km = st.number_input(
-                    "Marathon/Half Anchor Pace (min/km)",
+                    "Anchor Pace (min/km)",
                     min_value=3.0,
                     max_value=20.0,
                     value=float(cfg.get("marathon_pace_min_km") or 5.5),
                     step=0.1,
+                    help="Your realistic event anchor pace before split shaping is applied.",
                 )
         elif race_model == "fire_road_ultra":
             if input_mode == "finish_time":
@@ -251,6 +364,7 @@ def render_general_planner(repo_root: Path) -> None:
                     max_value=25.0,
                     value=float(cfg.get("z1_pace_min_km") or 8.0),
                     step=0.1,
+                    help="Your conservative all-day runnable pace on smoother trail terrain.",
                 )
                 z2_pace_min_km = st.number_input(
                     "Z2 Pace (min/km)",
@@ -258,6 +372,7 @@ def render_general_planner(repo_root: Path) -> None:
                     max_value=20.0,
                     value=float(cfg.get("z2_pace_min_km") or 7.0),
                     step=0.1,
+                    help="Your stronger but still sustainable pace when terrain and effort allow.",
                 )
                 hike_pace_min_km = st.number_input(
                     "Hike Pace (min/km)",
@@ -265,6 +380,7 @@ def render_general_planner(repo_root: Path) -> None:
                     max_value=40.0,
                     value=float(cfg.get("hike_pace_min_km") or 12.0),
                     step=0.1,
+                    help="Expected pace once climbing becomes more efficient to hike than run.",
                 )
         else:
             if input_mode == "finish_time":
@@ -277,11 +393,12 @@ def render_general_planner(repo_root: Path) -> None:
                 )
             else:
                 flat_pace_min_km = st.number_input(
-                    "Flat Pace (min/km)",
+                    "Flat Trail Pace (min/km)",
                     min_value=4.0,
                     max_value=25.0,
                     value=float(cfg.get("flat_pace_min_km") or 8.5),
                     step=0.1,
+                    help="Expected pace on runnable flat trail before fade and terrain penalties.",
                 )
                 hike_pace_min_km = st.number_input(
                     "Hike Pace (min/km)",
@@ -289,62 +406,131 @@ def render_general_planner(repo_root: Path) -> None:
                     max_value=40.0,
                     value=float(cfg.get("hike_pace_min_km") or 13.0),
                     step=0.1,
+                    help="Expected uphill hiking pace once the climb threshold is exceeded.",
                 )
 
-        st.markdown("### Strategy")
-        climb_hike_threshold_percent = st.slider(
-            "Climb Hike Threshold (%)",
-            min_value=5.0,
-            max_value=25.0,
-            value=float(cfg.get("climb_hike_threshold_percent", 12.0)),
-            step=0.5,
-        )
-        descent_caution = st.selectbox(
-            "Descent Caution",
-            options=["low", "medium", "high"],
-            index=["low", "medium", "high"].index(cfg.get("descent_caution", "medium")),
-        )
-        rpe_target = st.number_input(
-            "RPE Aggressiveness",
-            min_value=1.0,
-            max_value=10.0,
-            value=float(cfg.get("rpe_target") or 6.0),
-            step=0.5,
-            help="Secondary policy input: lower is conservative, higher is aggressive.",
-        )
-        hr_cap = st.number_input(
-            "HR Guardrail Cap",
-            min_value=80,
-            max_value=210,
-            value=int(cfg.get("hr_cap") or 155),
-            step=1,
-            help="Safety ceiling used as a guardrail when validating pacing choices.",
-        )
-        pacing_bias = st.slider(
-            "Pacing Bias",
-            min_value=-10.0,
-            max_value=10.0,
-            value=float(cfg.get("pacing_bias", 0.0)),
-            step=0.5,
-            help="Negative values bias earlier aggression. Positive values bias later caution.",
-        )
-        rest_duration_sec = st.slider(
-            "Rest Duration Per Aid Station (sec)",
-            min_value=0,
-            max_value=300,
-            value=int(cfg.get("rest_duration_sec", 30)),
-            step=15,
-            help="Applied as fixed additive elapsed time at each aid station.",
-        )
+        if _is_road_event(selected_event):
+            st.markdown("### Race Strategy")
+            pacing_bias = st.slider(
+                "Split Bias",
+                min_value=-10.0,
+                max_value=10.0,
+                value=float(cfg.get("pacing_bias", 0.0)),
+                step=0.5,
+                help="Negative values hold back a little early for a stronger finish. Positive values front-load the effort.",
+            )
+            rest_duration_sec = st.slider(
+                "Aid Stop Time (sec)",
+                min_value=0,
+                max_value=90,
+                value=int(cfg.get("rest_duration_sec", 10)),
+                step=5,
+                help="Optional slowdown per aid station for grabbing water or brief walking.",
+            )
+        else:
+            st.markdown("### Terrain & Fade")
+            climb_hike_threshold_percent = st.slider(
+                "Climb-to-Hike Threshold (%)",
+                min_value=5.0,
+                max_value=25.0,
+                value=float(cfg.get("climb_hike_threshold_percent", 12.0)),
+                step=0.5,
+                help="Grade where hiking becomes more efficient than running.",
+            )
+            if race_model == "technical_trail_ultra":
+                descent_caution = st.selectbox(
+                    "Descent Caution",
+                    options=["low", "medium", "high"],
+                    index=["low", "medium", "high"].index(cfg.get("descent_caution", "medium")),
+                    help="How conservatively to descend steep technical terrain.",
+                )
+            fade_profile_preset = st.selectbox(
+                "Fade Profile",
+                options=list(FADE_PROFILE_PRESETS.keys()),
+                index=list(FADE_PROFILE_PRESETS.keys()).index(
+                    str(cfg.get("fade_profile_preset") or "progressive_fade")
+                ),
+                format_func=lambda key: FADE_PROFILE_PRESETS[key][0],
+                help="How much pace is expected to fade across the day. Presets are backed by early, mid, and late-race phase values.",
+            )
+            fade_early_bias, fade_mid_bias, fade_late_bias = FADE_PROFILE_PRESETS[
+                fade_profile_preset
+            ][1]
+            st.caption(
+                f"Fade phases: early {fade_early_bias:.1f}, mid {fade_mid_bias:.1f}, late {fade_late_bias:.1f}"
+            )
+            rest_duration_min = st.slider(
+                "Aid Stop Time (min)",
+                min_value=0.0,
+                max_value=20.0,
+                value=round(float(cfg.get("rest_duration_sec", 180)) / 60.0, 1),
+                step=0.5,
+                help="Expected stopped or near-stopped time at each aid station.",
+            )
+            rest_duration_sec = int(rest_duration_min * 60)
+
+            with st.expander("Athlete Profile (Optional)"):
+                st.caption(
+                    "Saved in plan JSON and used to seed trail defaults. Leave fields blank if unknown."
+                )
+                lt1_hr_raw = st.text_input("LT1 HR", _profile_text(athlete_profile, "lt1_hr"))
+                lt2_hr_raw = st.text_input("LT2 HR", _profile_text(athlete_profile, "lt2_hr"))
+                lt1_hr_value = _parse_optional_number(lt1_hr_raw)
+                lt2_hr_value = _parse_optional_number(lt2_hr_raw)
+                athlete_profile["lt1_hr"] = int(lt1_hr_value) if lt1_hr_value is not None else None
+                athlete_profile["lt2_hr"] = int(lt2_hr_value) if lt2_hr_value is not None else None
+                athlete_profile["lt1_pace_min_km"] = _parse_optional_number(
+                    st.text_input(
+                        "LT1 Road Pace (min/km)",
+                        _profile_text(athlete_profile, "lt1_pace_min_km"),
+                    )
+                )
+                athlete_profile["lt2_pace_min_km"] = _parse_optional_number(
+                    st.text_input(
+                        "LT2 Road Pace (min/km)",
+                        _profile_text(athlete_profile, "lt2_pace_min_km"),
+                    )
+                )
+                athlete_profile["flat_trail_slowdown_sec_km"] = _parse_optional_number(
+                    st.text_input(
+                        "Flat Trail Slowdown vs Road (sec/km)",
+                        _profile_text(athlete_profile, "flat_trail_slowdown_sec_km"),
+                    )
+                )
+                athlete_profile["technical_trail_slowdown_sec_km"] = _parse_optional_number(
+                    st.text_input(
+                        "Technical Trail Slowdown vs Road (sec/km)",
+                        _profile_text(athlete_profile, "technical_trail_slowdown_sec_km"),
+                    )
+                )
+
+                suggested_flat_pace_min_km, suggested_hike_pace_min_km = (
+                    _trail_anchor_defaults_from_profile(
+                        athlete_profile,
+                        race_model,
+                    )
+                )
+                if suggested_flat_pace_min_km is not None:
+                    st.caption(
+                        f"Profile-derived trail anchor suggestion: {suggested_flat_pace_min_km:.2f} min/km flat, {suggested_hike_pace_min_km:.2f} min/km hike."
+                    )
 
         calculate_plan_clicked = st.button(
             "Calculate Plan", type="primary", use_container_width=True
         )
 
-    st.markdown("### Course Overview")
-    st.caption(
-        f"Template: {selected_template.label} | Model: {selected_event.race_model} | Course: {selected_course.gpx_path.name}"
+    if selected_course is None:
+        st.error("Could not resolve the selected event.")
+        return
+
+    overview_course = load_course_trackpoints(selected_course)
+    total_gain_m, total_loss_m = elevation_changes(
+        overview_course.trackpoints,
+        0.0,
+        overview_course.total_distance_km * 1000,
     )
+
+    st.markdown("### Course Overview")
     overview_a, overview_b = st.columns(2)
     with overview_a:
         for row in _course_overview_rows(overview_course.total_distance_km, selected_event):
@@ -370,10 +556,15 @@ def render_general_planner(repo_root: Path) -> None:
         descent_caution=descent_caution,
         rest_duration_sec=rest_duration_sec,
         pacing_bias=pacing_bias,
-        rpe_target=rpe_target,
-        hr_cap=hr_cap,
+        fade_profile_preset=None if _is_road_event(selected_event) else fade_profile_preset,
+        fade_early_bias=None if _is_road_event(selected_event) else fade_early_bias,
+        fade_mid_bias=None if _is_road_event(selected_event) else fade_mid_bias,
+        fade_late_bias=None if _is_road_event(selected_event) else fade_late_bias,
+        rpe_target=None,
+        hr_cap=None,
     )
     st.session_state["general_config"] = asdict(new_config)
+    st.session_state["general_athlete_profile"] = athlete_profile
 
     if calculate_plan_clicked:
         loaded = load_course_trackpoints(selected_course)
@@ -407,7 +598,6 @@ def render_general_planner(repo_root: Path) -> None:
                 pd.DataFrame(
                     [
                         {"Metric": "Terrain", "Value": selected_event.terrain.title()},
-                        {"Metric": "Race Model", "Value": selected_event.race_model},
                         {"Metric": "Elevation Gain", "Value": f"+{total_gain_m:.0f}m"},
                         {"Metric": "Elevation Loss", "Value": f"-{total_loss_m:.0f}m"},
                         {"Metric": "Aid Stations", "Value": str(len(result.aid_station_etas))},
@@ -490,6 +680,7 @@ def render_general_planner(repo_root: Path) -> None:
             course_id=chosen_course.course_id,
             gpx_filename=chosen_course.gpx_path.name,
             config=PacingConfig(**st.session_state["general_config"]),
+            athlete_profile=st.session_state["general_athlete_profile"],
         )
         st.download_button(
             "Download plan JSON",

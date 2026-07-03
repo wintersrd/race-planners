@@ -130,6 +130,40 @@ def test_pacing_bias_progressively_changes_total_time() -> None:
     assert "Pacing bias progressively shifts pace across the course." in conservative.assumptions
 
 
+def test_fade_profile_presets_change_trail_finish_time() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    course = get_course_by_id(repo_root, "grf92")
+    loaded = load_course_trackpoints(course)
+
+    stable = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=8.5,
+            hike_pace_min_km=13.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            fade_profile_preset="stable",
+        ),
+    )
+    blow_up = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=8.5,
+            hike_pace_min_km=13.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            fade_profile_preset="blow_up_risk",
+        ),
+    )
+
+    assert blow_up.total_time_min > stable.total_time_min
+    assert "Fade profile progressively slows pace across the event." in blow_up.assumptions
+
+
 def test_climb_hike_threshold_meaningfully_changes_grf92_finish_time() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     course = get_course_by_id(repo_root, "grf92")

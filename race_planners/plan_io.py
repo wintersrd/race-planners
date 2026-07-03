@@ -10,13 +10,20 @@ from race_planners.models import PacingConfig
 PLAN_SCHEMA_VERSION = 1
 
 
-def export_plan_json(course_id: str, gpx_filename: str, config: PacingConfig) -> str:
+def export_plan_json(
+    course_id: str,
+    gpx_filename: str,
+    config: PacingConfig,
+    athlete_profile: dict[str, Any] | None = None,
+) -> str:
     payload: dict[str, Any] = {
         "schema_version": PLAN_SCHEMA_VERSION,
         "course_id": course_id,
         "gpx_filename": gpx_filename,
         "config": asdict(config),
     }
+    if athlete_profile is not None:
+        payload["athlete_profile"] = athlete_profile
     return json.dumps(payload, indent=2, sort_keys=True)
 
 
@@ -37,5 +44,5 @@ def ensure_gpx_exists_for_plan(plan_payload: dict[str, Any], gpx_search_roots: l
         if candidate.exists():
             return candidate
     raise FileNotFoundError(
-        f"Missing course file: {gpx_filename}. Upload this GPX to restore the saved plan."
+        f"Missing course file: {gpx_filename}. Restore this course file in the repository to reload the saved plan."
     )

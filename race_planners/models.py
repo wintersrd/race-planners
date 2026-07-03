@@ -71,6 +71,16 @@ class CuratedEvent:
 
 
 @dataclass
+class AthleteProfile:
+    lt1_hr: int | None = None
+    lt1_pace_min_km: float | None = None
+    lt2_hr: int | None = None
+    lt2_pace_min_km: float | None = None
+    flat_trail_slowdown_sec_km: float | None = None
+    technical_trail_slowdown_sec_km: float | None = None
+
+
+@dataclass
 class PacingConfig:
     race_model: str
     input_mode: str
@@ -84,6 +94,10 @@ class PacingConfig:
     descent_caution: str = "medium"
     rest_duration_sec: int = 30
     pacing_bias: float = 0.0
+    fade_profile_preset: str | None = None
+    fade_early_bias: float | None = None
+    fade_mid_bias: float | None = None
+    fade_late_bias: float | None = None
     rpe_target: float | None = None
     hr_cap: int | None = None
 

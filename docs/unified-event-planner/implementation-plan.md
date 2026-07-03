@@ -102,6 +102,19 @@ Status: In progress
     model and unified planner sections view
   - added regression coverage for GRF92 threshold sensitivity, RPE/HR guardrail
     effects, and per-segment elevation stats
+- Post-phase control-model refinement completed:
+  - split the unified planner controls by event family so road events now focus
+    on target pace, split bias, and aid-stop time while trail/ultra events focus
+    on terrain handling, fade, and aid-station timing
+  - introduced preset-backed fade profiles (`Stable`, `Late Fade`,
+    `Progressive Fade`, `Blow-Up Risk`) while storing explicit early/mid/late
+    phase values in the planner config for later backend evolution
+  - added an optional athlete profile schema and persisted it through plan JSON
+    export/import so trail defaults can be seeded from known road and trail
+    reference data
+  - removed technical metadata such as model and GPX filename from the primary
+    planner surface and replaced it with plain-language help text tied to the
+    visible controls
 
 ## Objective
 

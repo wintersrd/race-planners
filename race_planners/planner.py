@@ -149,6 +149,10 @@ def _normalize_config(
             trackpoints=trackpoints,
             total_distance_km=total_distance_km,
             pacing_bias=config.pacing_bias,
+            fade_profile_preset=config.fade_profile_preset,
+            fade_early_bias=config.fade_early_bias,
+            fade_mid_bias=config.fade_mid_bias,
+            fade_late_bias=config.fade_late_bias,
             rpe_target=config.rpe_target,
             hr_cap=config.hr_cap,
         )
@@ -175,6 +179,10 @@ def _normalize_config(
             trackpoints=trackpoints,
             total_distance_km=total_distance_km,
             pacing_bias=config.pacing_bias,
+            fade_profile_preset=config.fade_profile_preset,
+            fade_early_bias=config.fade_early_bias,
+            fade_mid_bias=config.fade_mid_bias,
+            fade_late_bias=config.fade_late_bias,
             rpe_target=config.rpe_target,
             hr_cap=config.hr_cap,
         )
@@ -195,6 +203,10 @@ def _solve_base_pace_for_target(
     trackpoints: list[TrackPoint],
     total_distance_km: float,
     pacing_bias: float = 0.0,
+    fade_profile_preset: str | None = None,
+    fade_early_bias: float | None = None,
+    fade_mid_bias: float | None = None,
+    fade_late_bias: float | None = None,
     rpe_target: float | None = None,
     hr_cap: int | None = None,
 ) -> float:
@@ -208,6 +220,10 @@ def _solve_base_pace_for_target(
             trackpoints=trackpoints,
             total_distance_km=total_distance_km,
             pacing_bias=pacing_bias,
+            fade_profile_preset=fade_profile_preset,
+            fade_early_bias=fade_early_bias,
+            fade_mid_bias=fade_mid_bias,
+            fade_late_bias=fade_late_bias,
             rpe_target=rpe_target,
             hr_cap=hr_cap,
         )
@@ -224,9 +240,24 @@ def _simulate_total_time(
     trackpoints: list[TrackPoint],
     total_distance_km: float,
     pacing_bias: float = 0.0,
+    fade_profile_preset: str | None = None,
+    fade_early_bias: float | None = None,
+    fade_mid_bias: float | None = None,
+    fade_late_bias: float | None = None,
     rpe_target: float | None = None,
     hr_cap: int | None = None,
 ) -> float:
+    config = PacingConfig(
+        race_model=race_model,
+        input_mode="effort_anchor",
+        pacing_bias=pacing_bias,
+        fade_profile_preset=fade_profile_preset,
+        fade_early_bias=fade_early_bias,
+        fade_mid_bias=fade_mid_bias,
+        fade_late_bias=fade_late_bias,
+        rpe_target=rpe_target,
+        hr_cap=hr_cap,
+    )
     cumulative_time = 0.0
 
     full_km_count = int(total_distance_km)
@@ -237,7 +268,7 @@ def _simulate_total_time(
             trackpoints, start_m, end_m, km / max(total_distance_km, 1.0), cumulative_time
         )
         pace_min_km = model.pace_for_context(context)
-        pace_min_km *= _pacing_bias_multiplier(pacing_bias, context.progress_ratio)
+        pace_min_km *= _pacing_shape_multiplier(config, context.progress_ratio)
         pace_min_km *= _effort_guardrail_multiplier(rpe_target, hr_cap, context)
         cumulative_time += pace_min_km * _fatigue_multiplier(race_model, context.progress_ratio)
 
@@ -247,7 +278,7 @@ def _simulate_total_time(
         end_m = total_distance_km * 1000
         context = _pacing_context_for_range(trackpoints, start_m, end_m, 1.0, cumulative_time)
         pace_min_km = model.pace_for_context(context)
-        pace_min_km *= _pacing_bias_multiplier(pacing_bias, 1.0)
+        pace_min_km *= _pacing_shape_multiplier(config, 1.0)
         pace_min_km *= _effort_guardrail_multiplier(rpe_target, hr_cap, context)
         cumulative_time += pace_min_km * remaining * _fatigue_multiplier(race_model, 1.0)
 
@@ -278,7 +309,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
             trackpoints, start_m, end_m, progress_ratio, cumulative_time
         )
         pace_min_km = model.pace_for_context(context)
-        pace_min_km *= _pacing_bias_multiplier(config.pacing_bias, progress_ratio)
+        pace_min_km *= _pacing_shape_multiplier(config, progress_ratio)
         pace_min_km *= _effort_guardrail_multiplier(config.rpe_target, config.hr_cap, context)
         pace_min_km *= _fatigue_multiplier(config.race_model, progress_ratio)
         cumulative_time += pace_min_km
@@ -298,7 +329,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         end_m = total_distance_km * 1000
         context = _pacing_context_for_range(trackpoints, start_m, end_m, 1.0, cumulative_time)
         pace_min_km = model.pace_for_context(context)
-        pace_min_km *= _pacing_bias_multiplier(config.pacing_bias, 1.0)
+        pace_min_km *= _pacing_shape_multiplier(config, 1.0)
         pace_min_km *= _effort_guardrail_multiplier(config.rpe_target, config.hr_cap, context)
         pace_min_km *= _fatigue_multiplier(config.race_model, 1.0)
         segment_time = pace_min_km * remaining
@@ -363,8 +394,10 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
     warnings: list[str] = []
     if aid_station_etas and config.rest_duration_sec > 0:
         assumptions.append("Rest stops are modeled as fixed additive pauses.")
-    if config.pacing_bias != 0:
+    if _is_road_race_model(config.race_model) and config.pacing_bias != 0:
         assumptions.append("Pacing bias progressively shifts pace across the course.")
+    if not _is_road_race_model(config.race_model) and any(_fade_profile_values(config)):
+        assumptions.append("Fade profile progressively slows pace across the event.")
     if config.rpe_target is not None and config.rpe_target != 6.0:
         assumptions.append("RPE aggressiveness nudges pacing more conservatively or aggressively.")
     if config.hr_cap is not None and config.hr_cap != 155:
@@ -406,9 +439,50 @@ def _fatigue_multiplier(race_model: str, progress_ratio: float) -> float:
     return 1.0
 
 
+def _is_road_race_model(race_model: str) -> bool:
+    return race_model in {"road_marathon", "half_marathon"}
+
+
 def _pacing_bias_multiplier(pacing_bias: float, progress_ratio: float) -> float:
     ratio = min(max(progress_ratio, 0.0), 1.0)
     return max(0.85, 1.0 + (pacing_bias * 0.005 * ratio))
+
+
+def _fade_profile_values(config: PacingConfig) -> tuple[float, float, float]:
+    if None not in (config.fade_early_bias, config.fade_mid_bias, config.fade_late_bias):
+        return (
+            float(config.fade_early_bias or 0.0),
+            float(config.fade_mid_bias or 0.0),
+            float(config.fade_late_bias or 0.0),
+        )
+
+    preset_map = {
+        "stable": (0.0, 0.75, 1.5),
+        "late_fade": (0.0, 1.25, 3.5),
+        "progressive_fade": (0.5, 2.0, 4.5),
+        "blow_up_risk": (1.5, 4.0, 7.0),
+    }
+    return preset_map.get(config.fade_profile_preset or "stable", preset_map["stable"])
+
+
+def _interpolated_fade_bias(config: PacingConfig, progress_ratio: float) -> float:
+    early_bias, mid_bias, late_bias = _fade_profile_values(config)
+    ratio = min(max(progress_ratio, 0.0), 1.0)
+    if ratio <= 0.33:
+        return early_bias * (ratio / 0.33)
+    if ratio <= 0.66:
+        blend = (ratio - 0.33) / 0.33
+        return early_bias + ((mid_bias - early_bias) * blend)
+    blend = (ratio - 0.66) / 0.34
+    return mid_bias + ((late_bias - mid_bias) * blend)
+
+
+def _pacing_shape_multiplier(config: PacingConfig, progress_ratio: float) -> float:
+    if _is_road_race_model(config.race_model):
+        return _pacing_bias_multiplier(config.pacing_bias, progress_ratio)
+
+    fade_bias = _interpolated_fade_bias(config, progress_ratio)
+    return max(0.85, 1.0 + (fade_bias * 0.006))
 
 
 def _effort_guardrail_multiplier(
