@@ -44,5 +44,5 @@ def test_new_planner_gap_model_stays_close_to_legacy_for_same_base_gap_pace() ->
     new_result = calculate_plan(loaded, new_config)
 
     legacy_finish = legacy_result["calculated_finish_time_min"]
-    assert abs(new_result.total_time_min - legacy_finish) < 2.0
+    assert abs(new_result.moving_time_min - legacy_finish) < 2.0
     assert len(new_result.splits) == len(legacy_result["km_splits"])

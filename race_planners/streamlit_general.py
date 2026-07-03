@@ -35,6 +35,7 @@ def _default_config() -> dict[str, Any]:
         "climb_hike_threshold_percent": 12.0,
         "descent_caution": "medium",
         "rest_duration_sec": 30,
+        "pacing_bias": 0.0,
         "rpe_target": None,
         "hr_cap": None,
     }
@@ -251,7 +252,7 @@ def render_general_planner(repo_root: Path) -> None:
             "RPE Aggressiveness",
             min_value=1.0,
             max_value=10.0,
-            value=6.0,
+            value=float(cfg.get("rpe_target") or 6.0),
             step=0.5,
             help="Secondary policy input: lower is conservative, higher is aggressive.",
         )
@@ -260,9 +261,29 @@ def render_general_planner(repo_root: Path) -> None:
             "HR Guardrail Cap",
             min_value=80,
             max_value=210,
-            value=155,
+            value=int(cfg.get("hr_cap") or 155),
             step=1,
             help="Safety ceiling used as a guardrail when validating pacing choices.",
+        )
+
+    col_policy_a, col_policy_b = st.columns(2)
+    with col_policy_a:
+        pacing_bias = st.slider(
+            "Pacing Bias",
+            min_value=-10.0,
+            max_value=10.0,
+            value=float(cfg.get("pacing_bias", 0.0)),
+            step=0.5,
+            help="Negative values bias earlier aggression. Positive values bias later caution.",
+        )
+    with col_policy_b:
+        rest_duration_sec = st.slider(
+            "Rest Duration Per Aid Station (sec)",
+            min_value=0,
+            max_value=300,
+            value=int(cfg.get("rest_duration_sec", 30)),
+            step=15,
+            help="Applied as fixed additive elapsed time at each aid station.",
         )
 
     new_config = PacingConfig(
@@ -276,7 +297,8 @@ def render_general_planner(repo_root: Path) -> None:
         hike_pace_min_km=hike_pace_min_km,
         climb_hike_threshold_percent=climb_hike_threshold_percent,
         descent_caution=descent_caution,
-        rest_duration_sec=30,
+        rest_duration_sec=rest_duration_sec,
+        pacing_bias=pacing_bias,
         rpe_target=rpe_target,
         hr_cap=hr_cap,
     )
@@ -296,12 +318,34 @@ def render_general_planner(repo_root: Path) -> None:
         chosen_course = st.session_state["general_selected_course"]
         st.subheader("Plan Output")
         st.write(
-            f"Distance: {result.total_distance_km:.2f} km | Time: {result.total_time_min:.1f} min"
+            f"Distance: {result.total_distance_km:.2f} km | Elapsed: {result.total_time_min:.1f} min | Moving: {result.moving_time_min:.1f} min | Rest: {result.total_rest_time_min:.1f} min"
         )
-        st.write(
-            "Aid arrivals (min): "
-            + ", ".join(f"{value:.1f}" for value in result.aid_arrival_times_min)
-        )
+        if result.assumptions:
+            st.caption("Assumptions: " + " | ".join(result.assumptions))
+        if result.warnings:
+            for warning in result.warnings:
+                st.warning(warning)
+
+        if result.aid_station_etas:
+            st.markdown("#### Aid station timing")
+            st.dataframe(
+                [
+                    {
+                        "label": aid_eta.label or f"Aid {idx + 1}",
+                        "distance_km": round(aid_eta.distance_km, 2),
+                        "arrival_elapsed_min": round(aid_eta.arrival_elapsed_time_min, 2),
+                        "departure_elapsed_min": round(aid_eta.departure_elapsed_time_min, 2),
+                        "split_min": round(aid_eta.split_from_prev_min, 2),
+                        "split_pace": round(aid_eta.actual_pace_min_km, 2),
+                        "rest_min": round(aid_eta.suggested_rest_min, 2),
+                        "source": aid_eta.source,
+                    }
+                    for idx, aid_eta in enumerate(result.aid_station_etas)
+                ],
+                width="stretch",
+                hide_index=True,
+            )
+
         st.markdown("#### Segment pacing")
         st.dataframe(
             [
@@ -310,6 +354,8 @@ def render_general_planner(repo_root: Path) -> None:
                     "start_km": round(segment.start_km, 2),
                     "end_km": round(segment.end_km, 2),
                     "distance_km": round(segment.distance_km, 2),
+                    "start_min": round(segment.start_time_min, 2),
+                    "end_min": round(segment.end_time_min, 2),
                     "avg_grade": round(segment.avg_grade_percent, 2),
                     "avg_pace": round(segment.avg_pace_min_km, 2),
                     "segment_min": round(segment.segment_time_min, 2),

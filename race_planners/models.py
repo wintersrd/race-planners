@@ -83,6 +83,7 @@ class PacingConfig:
     climb_hike_threshold_percent: float = 12.0
     descent_caution: str = "medium"
     rest_duration_sec: int = 30
+    pacing_bias: float = 0.0
     rpe_target: float | None = None
     hr_cap: int | None = None
 
@@ -102,9 +103,26 @@ class SegmentSummary:
     start_km: float
     end_km: float
     distance_km: float
+    start_time_min: float
+    end_time_min: float
     avg_grade_percent: float
     avg_pace_min_km: float
     segment_time_min: float
+
+
+@dataclass
+class AidStationEta:
+    distance_km: float
+    label: str = ""
+    source: str = "config"
+    waypoint_type: str = ""
+    arrival_moving_time_min: float = 0.0
+    arrival_elapsed_time_min: float = 0.0
+    departure_elapsed_time_min: float = 0.0
+    split_from_prev_min: float = 0.0
+    split_distance_km: float = 0.0
+    actual_pace_min_km: float = 0.0
+    suggested_rest_min: float = 0.0
 
 
 @dataclass
@@ -112,5 +130,10 @@ class PlanResult:
     splits: list[PaceSplit]
     segments: list[SegmentSummary]
     aid_arrival_times_min: list[float]
+    aid_station_etas: list[AidStationEta]
+    moving_time_min: float
+    total_rest_time_min: float
     total_time_min: float
     total_distance_km: float
+    assumptions: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)

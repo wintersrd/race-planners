@@ -44,6 +44,19 @@ Status: In progress
     either finish-time or effort-anchor mode
   - added tests covering finish-time normalization for `technical_trail_ultra`
     and `fire_road_ultra`
+- Phase 5 completed:
+  - expanded the canonical planner result with typed aid-station ETA data,
+    moving time, total rest time, and planner assumptions/warnings so later UI
+    phases can render richer outputs without re-deriving timing details in the
+    app layer
+  - changed rest-stop handling to act as fixed additive elapsed time while still
+    preserving moving-time calculations underneath the planner engine
+  - introduced a generalized `pacing_bias` control as the canonical replacement
+    direction for legacy `power_fade`
+  - updated the beta planner output to surface elapsed vs moving time,
+    aid-station timing, and richer segment timing summaries
+  - added regression coverage for additive rest timing, typed aid-station ETAs,
+    pacing-bias behavior, and updated legacy compatibility expectations
 
 ## Objective
 
