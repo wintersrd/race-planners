@@ -62,6 +62,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             race_model="half_marathon",
             terrain="road",
             aid_stops_km=[5.3, 9.1, 14.5],
+            baseline_peak_temp_c=16.0,
         ),
         CuratedEvent(
             event_id="grf56",
@@ -73,6 +74,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             race_model="technical_trail_ultra",
             terrain="trail",
             start_time_local="12:30",
+            baseline_peak_temp_c=18.0,
         ),
         CuratedEvent(
             event_id="grf92",
@@ -84,6 +86,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             race_model="technical_trail_ultra",
             terrain="trail",
             start_time_local="06:30",
+            baseline_peak_temp_c=20.0,
         ),
         CuratedEvent(
             event_id="grf166",
@@ -95,6 +98,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             race_model="technical_trail_ultra",
             terrain="trail",
             start_time_local="17:00",
+            baseline_peak_temp_c=20.0,
         ),
         CuratedEvent(
             event_id="marathon-etoiles-baie",
@@ -106,6 +110,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             race_model="road_marathon",
             terrain="road",
             start_time_local="09:00",
+            baseline_peak_temp_c=16.0,
         ),
         CuratedEvent(
             event_id="trail-odet-ultra",
@@ -117,6 +122,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             race_model="technical_trail_ultra",
             terrain="trail",
             start_time_local="11:00",
+            baseline_peak_temp_c=20.0,
         ),
     )
 

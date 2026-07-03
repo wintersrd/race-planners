@@ -69,6 +69,7 @@ class CuratedEvent:
     aid_stops_km: list[float] = field(default_factory=list)
     default_input_mode: str = "finish_time"
     start_time_local: str | None = None
+    baseline_peak_temp_c: float | None = None
 
 
 @dataclass
@@ -112,6 +113,8 @@ class PacingConfig:
     athlete_technical_trail_slowdown_sec_km: float | None = None
     rpe_target: float | None = None
     hr_cap: int | None = None
+    peak_temperature_c: float | None = None
+    event_start_time_local: str | None = None
 
 
 @dataclass

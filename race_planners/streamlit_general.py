@@ -397,6 +397,7 @@ def _default_config_for_event(
     config = _default_config()
     config["race_model"] = event.race_model
     config["input_mode"] = event.default_input_mode
+    config["peak_temperature_c"] = event.baseline_peak_temp_c or 18.0
 
     if event.race_model == "half_marathon":
         config["target_finish_time_min"] = 105.0
@@ -722,6 +723,21 @@ def render_general_planner(repo_root: Path) -> None:
             )
             rest_duration_sec = int(rest_duration_min * 60)
 
+        st.markdown("### Weather")
+        peak_temperature_c = st.number_input(
+            "Expected Peak Temperature (°C)",
+            min_value=0.0,
+            max_value=45.0,
+            value=float(
+                cfg.get(
+                    "peak_temperature_c",
+                    selected_event.baseline_peak_temp_c or 18.0,
+                )
+            ),
+            step=1.0,
+            help="Peak temperature for the event. The planner applies a diurnal temperature curve and slows pace when it's hot.",
+        )
+
         with st.expander("Athlete Profile"):
             st.caption(
                 "Optional runner baselines used to seed defaults and derive advanced trail effort behavior. Saved in plan JSON."
@@ -911,6 +927,8 @@ def render_general_planner(repo_root: Path) -> None:
             None if _is_road_event(selected_event) else EFFORT_POLICY_PRESETS[effort_policy][1]
         ),
         hr_cap=(None if _is_road_event(selected_event) or not use_hr_guardrail else derived_hr_cap),
+        peak_temperature_c=peak_temperature_c,
+        event_start_time_local=selected_event.start_time_local,
     )
     st.session_state["general_config"] = asdict(new_config)
     st.session_state["general_athlete_profile"] = _normalized_athlete_profile(athlete_profile)

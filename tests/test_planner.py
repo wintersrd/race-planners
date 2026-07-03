@@ -391,3 +391,64 @@ def test_segment_summaries_include_elevation_gain_and_loss() -> None:
     assert result.segments
     assert any(segment.elevation_gain_m > 0 for segment in result.segments)
     assert any(segment.elevation_loss_m > 0 for segment in result.segments)
+
+
+def test_heat_penalty_materially_slows_grf92_finish_time() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    course = get_course_by_id(repo_root, "grf92")
+    loaded = load_course_trackpoints(course)
+
+    cool = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=8.5,
+            hike_pace_min_km=13.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            peak_temperature_c=10.0,
+            event_start_time_local="06:30",
+        ),
+    )
+    hot = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=8.5,
+            hike_pace_min_km=13.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            peak_temperature_c=30.0,
+            event_start_time_local="06:30",
+        ),
+    )
+
+    assert hot.total_time_min > cool.total_time_min
+    assert hot.total_time_min - cool.total_time_min > 30.0
+    assert any("Weather model applies heat penalty" in a for a in hot.assumptions)
+
+
+def test_heat_curve_handles_multi_day_ultra_without_crash() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    course = get_course_by_id(repo_root, "grf166")
+    loaded = load_course_trackpoints(course)
+
+    result = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=9.0,
+            hike_pace_min_km=14.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            peak_temperature_c=25.0,
+            event_start_time_local="17:00",
+        ),
+    )
+
+    assert result.total_time_min > 0
+    assert result.moving_time_min > 0
+    assert any("Weather model applies heat penalty" in a for a in result.assumptions)

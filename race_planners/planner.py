@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from typing import Callable
 
@@ -155,6 +156,8 @@ def _normalize_config(
             fade_late_bias=config.fade_late_bias,
             rpe_target=config.rpe_target,
             hr_cap=config.hr_cap,
+            peak_temperature_c=config.peak_temperature_c,
+            event_start_time_local=config.event_start_time_local,
         )
         return replace(
             config,
@@ -185,6 +188,8 @@ def _normalize_config(
             fade_late_bias=config.fade_late_bias,
             rpe_target=config.rpe_target,
             hr_cap=config.hr_cap,
+            peak_temperature_c=config.peak_temperature_c,
+            event_start_time_local=config.event_start_time_local,
         )
         return replace(
             config,
@@ -209,6 +214,8 @@ def _solve_base_pace_for_target(
     fade_late_bias: float | None = None,
     rpe_target: float | None = None,
     hr_cap: int | None = None,
+    peak_temperature_c: float | None = None,
+    event_start_time_local: str | None = None,
 ) -> float:
     low = 1.0
     high = 60.0
@@ -226,6 +233,8 @@ def _solve_base_pace_for_target(
             fade_late_bias=fade_late_bias,
             rpe_target=rpe_target,
             hr_cap=hr_cap,
+            peak_temperature_c=peak_temperature_c,
+            event_start_time_local=event_start_time_local,
         )
         if total_time_min < target_finish_time_min:
             low = mid
@@ -246,6 +255,8 @@ def _simulate_total_time(
     fade_late_bias: float | None = None,
     rpe_target: float | None = None,
     hr_cap: int | None = None,
+    peak_temperature_c: float | None = None,
+    event_start_time_local: str | None = None,
 ) -> float:
     config = PacingConfig(
         race_model=race_model,
@@ -257,6 +268,8 @@ def _simulate_total_time(
         fade_late_bias=fade_late_bias,
         rpe_target=rpe_target,
         hr_cap=hr_cap,
+        peak_temperature_c=peak_temperature_c,
+        event_start_time_local=event_start_time_local,
     )
     cumulative_time = 0.0
 
@@ -270,6 +283,7 @@ def _simulate_total_time(
         pace_min_km = model.pace_for_context(context)
         pace_min_km *= _pacing_shape_multiplier(config, context.progress_ratio)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
+        pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
         cumulative_time += pace_min_km * _fatigue_multiplier(race_model, context.progress_ratio)
 
     remaining = total_distance_km - full_km_count
@@ -280,6 +294,7 @@ def _simulate_total_time(
         pace_min_km = model.pace_for_context(context)
         pace_min_km *= _pacing_shape_multiplier(config, 1.0)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
+        pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
         cumulative_time += pace_min_km * remaining * _fatigue_multiplier(race_model, 1.0)
 
     return cumulative_time
@@ -311,6 +326,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         pace_min_km = model.pace_for_context(context)
         pace_min_km *= _pacing_shape_multiplier(config, progress_ratio)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
+        pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
         pace_min_km *= _fatigue_multiplier(config.race_model, progress_ratio)
         cumulative_time += pace_min_km
         splits.append(
@@ -331,6 +347,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         pace_min_km = model.pace_for_context(context)
         pace_min_km *= _pacing_shape_multiplier(config, 1.0)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
+        pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
         pace_min_km *= _fatigue_multiplier(config.race_model, 1.0)
         segment_time = pace_min_km * remaining
         cumulative_time += segment_time
@@ -413,6 +430,11 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         assumptions.append(
             "Derived HR guardrail tempers pacing on steeper or later-course segments."
         )
+    if config.peak_temperature_c is not None and config.peak_temperature_c > 10.0:
+        assumptions.append(
+            f"Weather model applies heat penalty using peak {config.peak_temperature_c:.0f}°C "
+            "with diurnal temperature variation across the event."
+        )
 
     return PlanResult(
         splits=splits,
@@ -448,6 +470,59 @@ def _fatigue_multiplier(race_model: str, progress_ratio: float) -> float:
             return 1.0
         return 1.0 + ((ratio - 0.5) / 0.5) * 0.08
     return 1.0
+
+
+_TEMP_PENALTY_TABLE: tuple[tuple[float, float], ...] = (
+    (10.0, 0.0),
+    (15.0, 0.015),
+    (20.0, 0.035),
+    (25.0, 0.065),
+    (28.0, 0.085),
+    (30.0, 0.10),
+    (35.0, 0.15),
+)
+
+
+def _heat_multiplier(temperature_c: float) -> float:
+    if temperature_c <= 10.0:
+        return 1.0
+    if temperature_c >= 35.0:
+        return 1.15 + (temperature_c - 35.0) * 0.005
+    for i in range(len(_TEMP_PENALTY_TABLE) - 1):
+        low_temp, low_penalty = _TEMP_PENALTY_TABLE[i]
+        high_temp, high_penalty = _TEMP_PENALTY_TABLE[i + 1]
+        if low_temp <= temperature_c <= high_temp:
+            fraction = (temperature_c - low_temp) / (high_temp - low_temp)
+            return 1.0 + low_penalty + (high_penalty - low_penalty) * fraction
+    return 1.0
+
+
+def _temperature_at_elapsed(
+    peak_temp_c: float, elapsed_hours: float, start_time_local: str | None
+) -> float:
+    temp_min = peak_temp_c - 12.0
+    if start_time_local:
+        try:
+            parts = start_time_local.split(":")
+            start_hour = float(parts[0]) + (float(parts[1]) / 60.0 if len(parts) > 1 else 0.0)
+        except (ValueError, IndexError):
+            start_hour = 9.0
+    else:
+        start_hour = 9.0
+    wall_hour = (start_hour + elapsed_hours) % 24.0
+    phase = 2.0 * math.pi * ((wall_hour - 4.0) / 24.0)
+    return temp_min + (peak_temp_c - temp_min) * 0.5 * (1.0 - math.cos(phase))
+
+
+def _segment_heat_multiplier(config: PacingConfig, cumulative_time_min: float) -> float:
+    if config.peak_temperature_c is None:
+        return 1.0
+    temp = _temperature_at_elapsed(
+        config.peak_temperature_c,
+        cumulative_time_min / 60.0,
+        config.event_start_time_local,
+    )
+    return _heat_multiplier(temp)
 
 
 def _is_road_race_model(race_model: str) -> bool:
