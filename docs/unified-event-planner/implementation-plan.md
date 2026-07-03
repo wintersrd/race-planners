@@ -68,6 +68,18 @@ Status: In progress
   - updated beta planner segment output to include derived section and block
     labels
   - added regression coverage for aid-boundary-aware segment generation
+- Phase 7 completed:
+  - removed the top-level planner-mode switch from `semi-marathon-finistere/app.py`
+    so the app now enters directly into the unified event-first planner flow
+  - renamed the planner shell from a beta/general planner framing to the
+    canonical unified event planner experience
+  - added an always-visible event/course overview beside the event setup so the
+    selected event, model, terrain, distance, and aid-station sourcing are shown
+    together in one flow
+  - removed remaining custom-upload-oriented messaging from the active planner
+    UI to align the app with the curated event-only product direction
+  - added helper-level coverage for the new course overview rendering inputs and
+    preserved app compile coverage for the updated single-entry Streamlit shell
 
 ## Objective
 

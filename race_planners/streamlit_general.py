@@ -12,14 +12,23 @@ from race_planners.event_catalog import (
     get_event_template,
     list_curated_events,
 )
-from race_planners.models import CuratedEvent
-from race_planners.models import PacingConfig
+from race_planners.models import CuratedEvent, PacingConfig
 from race_planners.plan_io import (
     ensure_gpx_exists_for_plan,
     export_plan_json,
     import_plan_json,
 )
 from race_planners.planner import calculate_plan, load_course_trackpoints
+
+
+def _course_overview_rows(total_distance_km: float, event: CuratedEvent) -> list[dict[str, str]]:
+    aid_mode = "Configured" if event.aid_stops_km else "From GPX"
+    return [
+        {"label": "Distance", "value": f"{total_distance_km:.2f} km"},
+        {"label": "Terrain", "value": event.terrain.title()},
+        {"label": "Race Model", "value": event.race_model},
+        {"label": "Aid Stations", "value": aid_mode},
+    ]
 
 
 def _default_config() -> dict[str, Any]:
@@ -84,8 +93,8 @@ def load_plan_into_state(
 
 
 def render_general_planner(repo_root: Path) -> None:
-    st.title("General Race Planner (Beta)")
-    st.caption("Curated event catalog with pluggable pacing models and JSON plan export/import.")
+    st.title("Unified Event Planner")
+    st.caption("Choose a curated event and plan it through one event-first pacing flow.")
 
     st.session_state.setdefault("general_config", _default_config())
     st.session_state.setdefault("general_event_id", "semi-marathon-finistere")
@@ -102,7 +111,7 @@ def render_general_planner(repo_root: Path) -> None:
             if load_error is not None:
                 st.error(f"Could not load plan: {load_error}")
                 st.info(
-                    "If this is a missing GPX, upload the route file and retry loading the plan."
+                    "If this is a missing GPX, restore the curated course file in the repository and retry loading the plan."
                 )
             else:
                 st.session_state["general_course_id"] = updated_state["general_course_id"]
@@ -138,9 +147,23 @@ def render_general_planner(repo_root: Path) -> None:
     else:
         st.session_state["general_course_id"] = selected_event.course_id
 
-    st.caption(
-        f"Template: {selected_template.label} | Model: {selected_event.race_model} | Course: {selected_course.gpx_path.name}"
-    )
+    overview_course = load_course_trackpoints(selected_course)
+
+    col_inputs, col_overview = st.columns([3, 2])
+    with col_inputs:
+        st.markdown("### Event Setup")
+        st.caption(
+            f"Template: {selected_template.label} | Model: {selected_event.race_model} | Course: {selected_course.gpx_path.name}"
+        )
+    with col_overview:
+        st.markdown("### Course Overview")
+        for row in _course_overview_rows(overview_course.total_distance_km, selected_event):
+            st.markdown(f"**{row['label']}:** {row['value']}")
+        if selected_course.aid_stations:
+            st.caption(
+                "Aid points: "
+                + ", ".join(f"{aid.distance_km:.1f} km" for aid in selected_course.aid_stations)
+            )
 
     cfg = st.session_state["general_config"]
     race_model = selected_event.race_model
@@ -305,9 +328,6 @@ def render_general_planner(repo_root: Path) -> None:
     st.session_state["general_config"] = asdict(new_config)
 
     if st.button("Calculate Plan", type="primary"):
-        if selected_course.course_id.startswith("upload:"):
-            selected_course = get_course_by_id(repo_root, selected_course.course_id)
-
         loaded = load_course_trackpoints(selected_course)
         result = calculate_plan(loaded, new_config)
         st.session_state["general_result"] = result

@@ -1359,18 +1359,10 @@ def generate_wrist_band(pacing_data: dict, total_distance_km: float) -> str:
 def main():
     configure_page()
 
-    planner_mode = st.radio(
-        "Planner mode",
-        options=["legacy_half_marathon", "general_beta"],
-        format_func=lambda x: "Legacy Half Marathon" if x == "legacy_half_marathon" else "General Planner (Beta)",
-        horizontal=True,
-    )
+    from race_planners.streamlit_general import render_general_planner
 
-    if planner_mode == "general_beta":
-        from race_planners.streamlit_general import render_general_planner
-
-        render_general_planner(Path(SCRIPT_DIR).parent)
-        return
+    render_general_planner(Path(SCRIPT_DIR).parent)
+    return
 
     # Load GPX data (cached)
     trackpoints, total_distance_km, gap_adjusted_distance_m = load_gpx_data(
