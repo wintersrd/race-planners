@@ -225,3 +225,57 @@ def weighted_average_grade(trackpoints: list[TrackPoint], start_m: float, end_m:
     if total_distance == 0:
         return 0.0
     return weighted_grade / total_distance
+
+
+def extreme_grade_in_range(
+    trackpoints: list[TrackPoint], start_m: float, end_m: float, *, uphill: bool
+) -> float:
+    """Return the steepest uphill or downhill average grade in a distance range."""
+    extreme = 0.0
+
+    for i in range(1, len(trackpoints)):
+        seg_start = trackpoints[i - 1].distance_from_start
+        seg_end = trackpoints[i].distance_from_start
+        if seg_end <= start_m or seg_start >= end_m:
+            continue
+
+        overlap_start = max(seg_start, start_m)
+        overlap_end = min(seg_end, end_m)
+        if overlap_end - overlap_start <= 0:
+            continue
+
+        grade = (trackpoints[i - 1].grade_percent + trackpoints[i].grade_percent) / 2
+        if uphill and grade > extreme:
+            extreme = grade
+        if not uphill and grade < extreme:
+            extreme = grade
+
+    return extreme
+
+
+def elevation_changes(
+    trackpoints: list[TrackPoint], start_m: float, end_m: float
+) -> tuple[float, float]:
+    """Calculate elevation gain and loss in meters across a distance range."""
+    gain = 0.0
+    loss = 0.0
+    prior_elevation: float | None = None
+
+    for point in trackpoints:
+        if point.distance_from_start < start_m:
+            prior_elevation = point.elevation
+            continue
+        if point.distance_from_start > end_m:
+            break
+        if prior_elevation is None:
+            prior_elevation = point.elevation
+            continue
+
+        diff = point.elevation - prior_elevation
+        if diff > 0:
+            gain += diff
+        else:
+            loss += abs(diff)
+        prior_elevation = point.elevation
+
+    return gain, loss

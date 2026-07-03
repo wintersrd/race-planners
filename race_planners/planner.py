@@ -5,6 +5,8 @@ from typing import Callable
 
 from race_planners.grade import (
     calculate_segment_grades,
+    elevation_changes,
+    extreme_grade_in_range,
     gap_factor,
     parse_gpx,
     smooth_elevation,
@@ -147,6 +149,8 @@ def _normalize_config(
             trackpoints=trackpoints,
             total_distance_km=total_distance_km,
             pacing_bias=config.pacing_bias,
+            rpe_target=config.rpe_target,
+            hr_cap=config.hr_cap,
         )
         return replace(
             config,
@@ -171,6 +175,8 @@ def _normalize_config(
             trackpoints=trackpoints,
             total_distance_km=total_distance_km,
             pacing_bias=config.pacing_bias,
+            rpe_target=config.rpe_target,
+            hr_cap=config.hr_cap,
         )
         return replace(
             config,
@@ -189,6 +195,8 @@ def _solve_base_pace_for_target(
     trackpoints: list[TrackPoint],
     total_distance_km: float,
     pacing_bias: float = 0.0,
+    rpe_target: float | None = None,
+    hr_cap: int | None = None,
 ) -> float:
     low = 1.0
     high = 60.0
@@ -200,6 +208,8 @@ def _solve_base_pace_for_target(
             trackpoints=trackpoints,
             total_distance_km=total_distance_km,
             pacing_bias=pacing_bias,
+            rpe_target=rpe_target,
+            hr_cap=hr_cap,
         )
         if total_time_min < target_finish_time_min:
             low = mid
@@ -214,6 +224,8 @@ def _simulate_total_time(
     trackpoints: list[TrackPoint],
     total_distance_km: float,
     pacing_bias: float = 0.0,
+    rpe_target: float | None = None,
+    hr_cap: int | None = None,
 ) -> float:
     cumulative_time = 0.0
 
@@ -221,31 +233,22 @@ def _simulate_total_time(
     for km in range(1, full_km_count + 1):
         start_m: float = (km - 1) * 1000
         end_m: float = km * 1000
-        avg_grade = weighted_average_grade(trackpoints, start_m, end_m)
-        progress_ratio = km / max(total_distance_km, 1.0)
-        context = PacingContext(
-            grade_percent=avg_grade,
-            progress_ratio=progress_ratio,
-            elapsed_hours=cumulative_time / 60,
-            climb_m_per_km=max(avg_grade, 0.0) * 10,
+        context = _pacing_context_for_range(
+            trackpoints, start_m, end_m, km / max(total_distance_km, 1.0), cumulative_time
         )
         pace_min_km = model.pace_for_context(context)
-        pace_min_km *= _pacing_bias_multiplier(pacing_bias, progress_ratio)
-        cumulative_time += pace_min_km * _fatigue_multiplier(race_model, progress_ratio)
+        pace_min_km *= _pacing_bias_multiplier(pacing_bias, context.progress_ratio)
+        pace_min_km *= _effort_guardrail_multiplier(rpe_target, hr_cap, context)
+        cumulative_time += pace_min_km * _fatigue_multiplier(race_model, context.progress_ratio)
 
     remaining = total_distance_km - full_km_count
     if remaining > 0.01:
         start_m = float(full_km_count * 1000)
         end_m = total_distance_km * 1000
-        avg_grade = weighted_average_grade(trackpoints, start_m, end_m)
-        context = PacingContext(
-            grade_percent=avg_grade,
-            progress_ratio=1.0,
-            elapsed_hours=cumulative_time / 60,
-            climb_m_per_km=max(avg_grade, 0.0) * 10,
-        )
+        context = _pacing_context_for_range(trackpoints, start_m, end_m, 1.0, cumulative_time)
         pace_min_km = model.pace_for_context(context)
         pace_min_km *= _pacing_bias_multiplier(pacing_bias, 1.0)
+        pace_min_km *= _effort_guardrail_multiplier(rpe_target, hr_cap, context)
         cumulative_time += pace_min_km * remaining * _fatigue_multiplier(race_model, 1.0)
 
     return cumulative_time
@@ -270,23 +273,20 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
     for km in range(1, full_km_count + 1):
         start_m: float = (km - 1) * 1000
         end_m: float = km * 1000
-        avg_grade = weighted_average_grade(trackpoints, start_m, end_m)
         progress_ratio = km / max(total_distance_km, 1.0)
-        context = PacingContext(
-            grade_percent=avg_grade,
-            progress_ratio=progress_ratio,
-            elapsed_hours=cumulative_time / 60,
-            climb_m_per_km=max(avg_grade, 0.0) * 10,
+        context = _pacing_context_for_range(
+            trackpoints, start_m, end_m, progress_ratio, cumulative_time
         )
         pace_min_km = model.pace_for_context(context)
         pace_min_km *= _pacing_bias_multiplier(config.pacing_bias, progress_ratio)
+        pace_min_km *= _effort_guardrail_multiplier(config.rpe_target, config.hr_cap, context)
         pace_min_km *= _fatigue_multiplier(config.race_model, progress_ratio)
         cumulative_time += pace_min_km
         splits.append(
             PaceSplit(
                 km=float(km),
                 actual_pace_min_km=pace_min_km,
-                grade_percent=avg_grade,
+                grade_percent=context.grade_percent,
                 segment_time_min=pace_min_km,
                 cumulative_time_min=cumulative_time,
             )
@@ -296,15 +296,10 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
     if remaining > 0.01:
         start_m = float(full_km_count * 1000)
         end_m = total_distance_km * 1000
-        avg_grade = weighted_average_grade(trackpoints, start_m, end_m)
-        context = PacingContext(
-            grade_percent=avg_grade,
-            progress_ratio=1.0,
-            elapsed_hours=cumulative_time / 60,
-            climb_m_per_km=max(avg_grade, 0.0) * 10,
-        )
+        context = _pacing_context_for_range(trackpoints, start_m, end_m, 1.0, cumulative_time)
         pace_min_km = model.pace_for_context(context)
         pace_min_km *= _pacing_bias_multiplier(config.pacing_bias, 1.0)
+        pace_min_km *= _effort_guardrail_multiplier(config.rpe_target, config.hr_cap, context)
         pace_min_km *= _fatigue_multiplier(config.race_model, 1.0)
         segment_time = pace_min_km * remaining
         cumulative_time += segment_time
@@ -312,7 +307,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
             PaceSplit(
                 km=round(total_distance_km, 2),
                 actual_pace_min_km=pace_min_km,
-                grade_percent=avg_grade,
+                grade_percent=context.grade_percent,
                 segment_time_min=segment_time,
                 cumulative_time_min=cumulative_time,
             )
@@ -370,6 +365,10 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         assumptions.append("Rest stops are modeled as fixed additive pauses.")
     if config.pacing_bias != 0:
         assumptions.append("Pacing bias progressively shifts pace across the course.")
+    if config.rpe_target is not None and config.rpe_target != 6.0:
+        assumptions.append("RPE aggressiveness nudges pacing more conservatively or aggressively.")
+    if config.hr_cap is not None and config.hr_cap != 155:
+        assumptions.append("HR guardrail tempers pacing on steeper or later-course segments.")
 
     return PlanResult(
         splits=splits,
@@ -377,6 +376,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
             splits,
             aid_stations=valid_aid_stations,
             total_distance_km=total_distance_km,
+            trackpoints=trackpoints,
         ),
         aid_arrival_times_min=aid_arrival_times,
         aid_station_etas=aid_station_etas,
@@ -409,6 +409,43 @@ def _fatigue_multiplier(race_model: str, progress_ratio: float) -> float:
 def _pacing_bias_multiplier(pacing_bias: float, progress_ratio: float) -> float:
     ratio = min(max(progress_ratio, 0.0), 1.0)
     return max(0.85, 1.0 + (pacing_bias * 0.005 * ratio))
+
+
+def _effort_guardrail_multiplier(
+    rpe_target: float | None, hr_cap: int | None, context: PacingContext
+) -> float:
+    multiplier = 1.0
+
+    if rpe_target is not None:
+        multiplier *= max(0.88, min(1.12, 1.0 - ((rpe_target - 6.0) * 0.02)))
+
+    if hr_cap is not None:
+        climb_load = max(context.grade_percent, 0.0) + (context.steepest_climb_percent * 0.6)
+        late_load = context.progress_ratio * 4.0
+        guardrail_load = min(1.0, (climb_load / 18.0) + (late_load / 10.0))
+        multiplier *= 1.0 + (((155 - hr_cap) / 25.0) * 0.08 * guardrail_load)
+
+    return max(0.82, min(1.18, multiplier))
+
+
+def _pacing_context_for_range(
+    trackpoints: list[TrackPoint],
+    start_m: float,
+    end_m: float,
+    progress_ratio: float,
+    cumulative_time_min: float,
+) -> PacingContext:
+    avg_grade = weighted_average_grade(trackpoints, start_m, end_m)
+    steepest_climb = extreme_grade_in_range(trackpoints, start_m, end_m, uphill=True)
+    steepest_descent = extreme_grade_in_range(trackpoints, start_m, end_m, uphill=False)
+    return PacingContext(
+        grade_percent=avg_grade,
+        progress_ratio=progress_ratio,
+        elapsed_hours=cumulative_time_min / 60,
+        climb_m_per_km=max(avg_grade, 0.0) * 10,
+        steepest_climb_percent=steepest_climb,
+        steepest_descent_percent=steepest_descent,
+    )
 
 
 def _segment_type(grade_percent: float) -> str:
@@ -474,6 +511,7 @@ def _build_segment_summaries(
     splits: list[PaceSplit],
     aid_stations: list[AidStation] | None = None,
     total_distance_km: float | None = None,
+    trackpoints: list[TrackPoint] | None = None,
 ) -> list[SegmentSummary]:
     if not splits:
         return []
@@ -538,6 +576,16 @@ def _build_segment_summaries(
                         avg_grade_percent=weighted_grade / distance_km,
                         avg_pace_min_km=weighted_pace / distance_km,
                         segment_time_min=segment_time,
+                        elevation_gain_m=(
+                            elevation_changes(trackpoints, start_km * 1000, prev_end_km * 1000)[0]
+                            if trackpoints is not None
+                            else 0.0
+                        ),
+                        elevation_loss_m=(
+                            elevation_changes(trackpoints, start_km * 1000, prev_end_km * 1000)[1]
+                            if trackpoints is not None
+                            else 0.0
+                        ),
                     )
                 )
                 current_type = piece_type
@@ -569,6 +617,16 @@ def _build_segment_summaries(
                     avg_grade_percent=weighted_grade / distance_km,
                     avg_pace_min_km=weighted_pace / distance_km,
                     segment_time_min=segment_time,
+                    elevation_gain_m=(
+                        elevation_changes(trackpoints, start_km * 1000, prev_end_km * 1000)[0]
+                        if trackpoints is not None
+                        else 0.0
+                    ),
+                    elevation_loss_m=(
+                        elevation_changes(trackpoints, start_km * 1000, prev_end_km * 1000)[1]
+                        if trackpoints is not None
+                        else 0.0
+                    ),
                 )
             )
 

@@ -4,7 +4,10 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+import matplotlib.pyplot as plt
+import pandas as pd
 import streamlit as st
+from matplotlib.figure import Figure
 
 from race_planners.course_library import get_course_by_id
 from race_planners.event_catalog import (
@@ -12,6 +15,7 @@ from race_planners.event_catalog import (
     get_event_template,
     list_curated_events,
 )
+from race_planners.grade import elevation_changes
 from race_planners.models import CuratedEvent, PacingConfig
 from race_planners.plan_io import (
     ensure_gpx_exists_for_plan,
@@ -29,6 +33,36 @@ def _course_overview_rows(total_distance_km: float, event: CuratedEvent) -> list
         {"label": "Race Model", "value": event.race_model},
         {"label": "Aid Stations", "value": aid_mode},
     ]
+
+
+def _plot_course_profile(trackpoints: list[Any], aid_distances_km: list[float]) -> Figure:
+    fig, ax = plt.subplots(figsize=(12, 4))
+    distances_km = [point.distance_from_start / 1000 for point in trackpoints]
+    elevations = [point.elevation for point in trackpoints]
+    ax.fill_between(distances_km, elevations, color="#2E86AB", alpha=0.28)
+    ax.plot(distances_km, elevations, color="#2E86AB", linewidth=2.2)
+    for aid_distance_km in aid_distances_km:
+        ax.axvline(aid_distance_km, color="#E94F37", linestyle="--", linewidth=1.2, alpha=0.85)
+    ax.set_xlabel("Distance (km)")
+    ax.set_ylabel("Elevation (m)")
+    ax.set_title("Course Elevation Profile", fontsize=14, fontweight="bold")
+    ax.grid(alpha=0.18)
+    plt.tight_layout()
+    return fig
+
+
+def _plot_pace_profile(result: Any) -> Figure:
+    fig, ax = plt.subplots(figsize=(12, 4))
+    kms = [split.km for split in result.splits]
+    paces = [split.actual_pace_min_km for split in result.splits]
+    colors = ["#E94F37" if split.grade_percent > 1.5 else "#2E86AB" for split in result.splits]
+    ax.bar(kms, paces, width=0.85, color=colors, alpha=0.75)
+    ax.set_xlabel("Distance (km)")
+    ax.set_ylabel("Pace (min/km)")
+    ax.set_title("Planned Pace Profile", fontsize=14, fontweight="bold")
+    ax.grid(axis="y", alpha=0.18)
+    plt.tight_layout()
+    return fig
 
 
 def _default_config() -> dict[str, Any]:
@@ -144,10 +178,18 @@ def render_general_planner(repo_root: Path) -> None:
         st.session_state["general_event_id"] = selected_event.event_id
         st.session_state["general_course_id"] = selected_event.course_id
         st.session_state["general_config"] = _default_config_for_event(selected_event)
+        st.session_state.pop("general_result", None)
+        st.session_state.pop("general_selected_course", None)
+        st.session_state.pop("general_loaded_course", None)
     else:
         st.session_state["general_course_id"] = selected_event.course_id
 
     overview_course = load_course_trackpoints(selected_course)
+    total_gain_m, total_loss_m = elevation_changes(
+        overview_course.trackpoints,
+        0.0,
+        overview_course.total_distance_km * 1000,
+    )
 
     col_inputs, col_overview = st.columns([3, 2])
     with col_inputs:
@@ -159,6 +201,7 @@ def render_general_planner(repo_root: Path) -> None:
         st.markdown("### Course Overview")
         for row in _course_overview_rows(overview_course.total_distance_km, selected_event):
             st.markdown(f"**{row['label']}:** {row['value']}")
+        st.markdown(f"**Elevation Gain / Loss:** +{total_gain_m:.0f}m / -{total_loss_m:.0f}m")
         if selected_course.aid_stations:
             st.caption(
                 "Aid points: "
@@ -332,77 +375,111 @@ def render_general_planner(repo_root: Path) -> None:
         result = calculate_plan(loaded, new_config)
         st.session_state["general_result"] = result
         st.session_state["general_selected_course"] = selected_course
+        st.session_state["general_loaded_course"] = loaded
 
     if "general_result" in st.session_state:
         result = st.session_state["general_result"]
         chosen_course = st.session_state["general_selected_course"]
+        loaded_course = st.session_state.get("general_loaded_course", overview_course)
         st.subheader("Plan Output")
-        st.write(
-            f"Distance: {result.total_distance_km:.2f} km | Elapsed: {result.total_time_min:.1f} min | Moving: {result.moving_time_min:.1f} min | Rest: {result.total_rest_time_min:.1f} min"
-        )
+        summary_a, summary_b, summary_c, summary_d = st.columns(4)
+        summary_a.metric("Distance", f"{result.total_distance_km:.2f} km")
+        summary_b.metric("Elapsed", f"{result.total_time_min:.1f} min")
+        summary_c.metric("Moving", f"{result.moving_time_min:.1f} min")
+        summary_d.metric("Rest", f"{result.total_rest_time_min:.1f} min")
         if result.assumptions:
             st.caption("Assumptions: " + " | ".join(result.assumptions))
         if result.warnings:
             for warning in result.warnings:
                 st.warning(warning)
 
-        if result.aid_station_etas:
-            st.markdown("#### Aid station timing")
+        tab_summary, tab_profile, tab_aid, tab_sections, tab_splits = st.tabs(
+            ["Summary", "Course Profile", "Aid Stations", "Sections", "Splits"]
+        )
+
+        with tab_summary:
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {"Metric": "Terrain", "Value": selected_event.terrain.title()},
+                        {"Metric": "Race Model", "Value": selected_event.race_model},
+                        {"Metric": "Elevation Gain", "Value": f"+{total_gain_m:.0f}m"},
+                        {"Metric": "Elevation Loss", "Value": f"-{total_loss_m:.0f}m"},
+                        {"Metric": "Aid Stations", "Value": str(len(result.aid_station_etas))},
+                    ]
+                ),
+                width="stretch",
+                hide_index=True,
+            )
+
+        with tab_profile:
+            st.pyplot(_plot_course_profile(loaded_course.trackpoints, chosen_course.aid_stops_km))
+            st.pyplot(_plot_pace_profile(result))
+
+        with tab_aid:
+            if result.aid_station_etas:
+                st.markdown("#### Aid station timing")
+                st.dataframe(
+                    [
+                        {
+                            "label": aid_eta.label or f"Aid {idx + 1}",
+                            "distance_km": round(aid_eta.distance_km, 2),
+                            "arrival_elapsed_min": round(aid_eta.arrival_elapsed_time_min, 2),
+                            "departure_elapsed_min": round(aid_eta.departure_elapsed_time_min, 2),
+                            "split_min": round(aid_eta.split_from_prev_min, 2),
+                            "split_pace": round(aid_eta.actual_pace_min_km, 2),
+                            "rest_min": round(aid_eta.suggested_rest_min, 2),
+                            "source": aid_eta.source,
+                        }
+                        for idx, aid_eta in enumerate(result.aid_station_etas)
+                    ],
+                    width="stretch",
+                    hide_index=True,
+                )
+            else:
+                st.info("No in-range aid stations were available for this course.")
+
+        with tab_sections:
+            st.markdown("#### Segment pacing")
             st.dataframe(
                 [
                     {
-                        "label": aid_eta.label or f"Aid {idx + 1}",
-                        "distance_km": round(aid_eta.distance_km, 2),
-                        "arrival_elapsed_min": round(aid_eta.arrival_elapsed_time_min, 2),
-                        "departure_elapsed_min": round(aid_eta.departure_elapsed_time_min, 2),
-                        "split_min": round(aid_eta.split_from_prev_min, 2),
-                        "split_pace": round(aid_eta.actual_pace_min_km, 2),
-                        "rest_min": round(aid_eta.suggested_rest_min, 2),
-                        "source": aid_eta.source,
+                        "section": segment.section_name or segment.segment_type,
+                        "block": segment.block_label,
+                        "type": segment.segment_type,
+                        "start_km": round(segment.start_km, 2),
+                        "end_km": round(segment.end_km, 2),
+                        "distance_km": round(segment.distance_km, 2),
+                        "elev_gain_m": round(segment.elevation_gain_m, 1),
+                        "elev_loss_m": round(segment.elevation_loss_m, 1),
+                        "start_min": round(segment.start_time_min, 2),
+                        "end_min": round(segment.end_time_min, 2),
+                        "avg_grade": round(segment.avg_grade_percent, 2),
+                        "avg_pace": round(segment.avg_pace_min_km, 2),
+                        "segment_min": round(segment.segment_time_min, 2),
                     }
-                    for idx, aid_eta in enumerate(result.aid_station_etas)
+                    for segment in result.segments
                 ],
                 width="stretch",
                 hide_index=True,
             )
 
-        st.markdown("#### Segment pacing")
-        st.dataframe(
-            [
-                {
-                    "section": segment.section_name or segment.segment_type,
-                    "block": segment.block_label,
-                    "type": segment.segment_type,
-                    "start_km": round(segment.start_km, 2),
-                    "end_km": round(segment.end_km, 2),
-                    "distance_km": round(segment.distance_km, 2),
-                    "start_min": round(segment.start_time_min, 2),
-                    "end_min": round(segment.end_time_min, 2),
-                    "avg_grade": round(segment.avg_grade_percent, 2),
-                    "avg_pace": round(segment.avg_pace_min_km, 2),
-                    "segment_min": round(segment.segment_time_min, 2),
-                }
-                for segment in result.segments
-            ],
-            width="stretch",
-            hide_index=True,
-        )
-
-        st.markdown("#### Kilometer pacing")
-        st.dataframe(
-            [
-                {
-                    "km": split.km,
-                    "pace": round(split.actual_pace_min_km, 2),
-                    "grade": round(split.grade_percent, 2),
-                    "segment_min": round(split.segment_time_min, 2),
-                    "cum_min": round(split.cumulative_time_min, 2),
-                }
-                for split in result.splits
-            ],
-            width="stretch",
-            hide_index=True,
-        )
+        with tab_splits:
+            st.markdown("#### Kilometer pacing")
+            st.dataframe(
+                [
+                    {
+                        "km": split.km,
+                        "pace": round(split.actual_pace_min_km, 2),
+                        "grade": round(split.grade_percent, 2),
+                        "segment_min": round(split.segment_time_min, 2),
+                        "cum_min": round(split.cumulative_time_min, 2),
+                    }
+                    for split in result.splits
+                ],
+                width="stretch",
+                hide_index=True,
+            )
 
         plan_json = export_plan_json(
             course_id=chosen_course.course_id,

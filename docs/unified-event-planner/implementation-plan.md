@@ -89,6 +89,19 @@ Status: In progress
     regression coverage
   - removed remaining active-product references to GPX re-upload guidance in the
     main README in favor of repository-backed curated course restoration wording
+- Post-phase regression remediation completed:
+  - restored meaningful trail sensitivity for climb/hike threshold decisions by
+    feeding steepest local climb grades into ultra pacing contexts instead of
+    relying only on kilometer-average grade
+  - wired `rpe_target` and `hr_cap` into both finish-time solving and actual
+    plan generation so those controls now materially change outcomes instead of
+    acting as no-op UI fields
+  - restored visual hierarchy in the unified planner with summary metrics,
+    profile charts, and tabbed outputs rather than a flat wall of tables
+  - restored segment elevation gain/loss statistics in the canonical result
+    model and unified planner sections view
+  - added regression coverage for GRF92 threshold sensitivity, RPE/HR guardrail
+    effects, and per-segment elevation stats
 
 ## Objective
 

@@ -93,6 +93,8 @@ class PacingContext:
     progress_ratio: float
     elapsed_hours: float
     climb_m_per_km: float
+    steepest_climb_percent: float = 0.0
+    steepest_descent_percent: float = 0.0
 
 
 class PacingModel(Protocol):
@@ -117,7 +119,7 @@ class FireRoadUltraModel:
         return apply_hike_switch(
             running_pace_min_km=run_pace,
             hike_pace_min_km=self.hike_pace_min_km,
-            grade_percent=context.grade_percent,
+            grade_percent=max(context.grade_percent, context.steepest_climb_percent),
             threshold_percent=self.hike_threshold_percent,
         )
 
@@ -133,7 +135,7 @@ class TechnicalTrailUltraModel:
         return technical_trail_pace(
             flat_pace_min_km=self.flat_pace_min_km,
             hike_pace_min_km=self.hike_pace_min_km,
-            grade_percent=context.grade_percent,
+            grade_percent=max(context.grade_percent, context.steepest_climb_percent),
             climb_hike_threshold_percent=self.hike_threshold_percent,
             descent_caution=self.descent_caution,
         )
