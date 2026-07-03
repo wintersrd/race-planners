@@ -25,6 +25,30 @@ def test_parse_gpx_supports_route_points(tmp_path: Path) -> None:
     assert trackpoints[-1].elevation == 15
 
 
+def test_parse_gpx_supports_https_gpx_namespace(tmp_path: Path) -> None:
+    gpx_path = tmp_path / "https-namespace.gpx"
+    gpx_path.write_text(
+        """<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" xmlns="https://www.topografix.com/GPX/1/1">
+  <trk>
+    <trkseg>
+      <trkpt lat="48.0" lon="-4.0"><ele>5</ele></trkpt>
+      <trkpt lat="48.0" lon="-3.99"><ele>10</ele></trkpt>
+      <trkpt lat="48.0" lon="-3.98"><ele>15</ele></trkpt>
+    </trkseg>
+  </trk>
+</gpx>
+""",
+        encoding="utf-8",
+    )
+
+    trackpoints = parse_gpx(str(gpx_path))
+
+    assert len(trackpoints) == 3
+    assert trackpoints[-1].distance_from_start > 0
+    assert trackpoints[-1].elevation == 15
+
+
 def test_extract_aid_stops_km_uses_waypoint_types_and_ignores_start_finish(tmp_path: Path) -> None:
     gpx_path = tmp_path / "aid-stops.gpx"
     gpx_path.write_text(

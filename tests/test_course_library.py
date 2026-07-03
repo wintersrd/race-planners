@@ -24,6 +24,8 @@ def test_get_builtin_courses_uses_curated_event_catalog(tmp_path: Path) -> None:
     (course_dir / "semi-marathon-du-finistere.gpx").write_text("<gpx></gpx>", encoding="utf-8")
     (course_dir / "2026-grf92.gpx").write_text("<gpx></gpx>", encoding="utf-8")
     (course_dir / "2026-grf166.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+    (course_dir / "marathon-des-etoiles-de-la-baie.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+    (course_dir / "trail-de-l-odet-ultra.gpx").write_text("<gpx></gpx>", encoding="utf-8")
     (course_dir / "2026-grf56.gpx").write_text(
         """<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1">
@@ -47,6 +49,8 @@ def test_get_builtin_courses_uses_curated_event_catalog(tmp_path: Path) -> None:
         "grf56",
         "grf92",
         "grf166",
+        "marathon-etoiles-baie",
+        "trail-odet-ultra",
     ]
     finistere = next(course for course in courses if course.course_id == "semi-marathon-finistere")
     grf56 = next(course for course in courses if course.course_id == "grf56")

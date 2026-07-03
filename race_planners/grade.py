@@ -6,6 +6,13 @@ import xml.etree.ElementTree as ET
 from race_planners.models import AidStation, TrackPoint
 
 
+def _gpx_namespace(root: ET.Element) -> dict[str, str]:
+    if root.tag.startswith("{") and "}" in root.tag:
+        namespace_uri = root.tag[1 : root.tag.index("}")]
+        return {"gpx": namespace_uri}
+    return {"gpx": "http://www.topografix.com/GPX/1/1"}
+
+
 def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Calculate distance between two points in meters."""
     radius_m = 6_371_000
@@ -25,7 +32,7 @@ def parse_gpx(filepath: str) -> list[TrackPoint]:
     """Parse GPX file and return list of TrackPoints."""
     tree = ET.parse(filepath)
     root = tree.getroot()
-    ns = {"gpx": "http://www.topografix.com/GPX/1/1"}
+    ns = _gpx_namespace(root)
     trackpoints: list[TrackPoint] = []
     cumulative_distance = 0.0
     prev_point: TrackPoint | None = None
@@ -78,7 +85,7 @@ def extract_aid_stations(filepath: str) -> list[AidStation]:
 
     tree = ET.parse(filepath)
     root = tree.getroot()
-    ns = {"gpx": "http://www.topografix.com/GPX/1/1"}
+    ns = _gpx_namespace(root)
     aid_stations: list[AidStation] = []
     total_distance_m = trackpoints[-1].distance_from_start
 

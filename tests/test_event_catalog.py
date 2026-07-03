@@ -12,6 +12,8 @@ def test_list_curated_events_returns_existing_repo_events(tmp_path: Path) -> Non
         "2026-grf56.gpx",
         "2026-grf92.gpx",
         "2026-grf166.gpx",
+        "marathon-des-etoiles-de-la-baie.gpx",
+        "trail-de-l-odet-ultra.gpx",
     ]:
         (course_dir / filename).write_text("<gpx></gpx>", encoding="utf-8")
 
@@ -22,10 +24,16 @@ def test_list_curated_events_returns_existing_repo_events(tmp_path: Path) -> Non
         "grf56",
         "grf92",
         "grf166",
+        "marathon-etoiles-baie",
+        "trail-odet-ultra",
     ]
     assert events[0].template_id == "road_half"
-    assert all(event.template_id == "trail_ultra" for event in events[1:])
-    assert all(event.race_model == "technical_trail_ultra" for event in events[1:])
+    assert events[4].template_id == "road_marathon"
+    assert events[4].race_model == "road_marathon"
+    assert all(event.template_id == "trail_ultra" for event in events[1:4])
+    assert all(event.race_model == "technical_trail_ultra" for event in events[1:4])
+    assert events[5].template_id == "trail_ultra"
+    assert events[5].race_model == "technical_trail_ultra"
 
 
 def test_get_curated_event_returns_event_metadata(tmp_path: Path) -> None:
@@ -39,6 +47,21 @@ def test_get_curated_event_returns_event_metadata(tmp_path: Path) -> None:
     assert event.course_id == "semi-marathon-finistere"
     assert event.aid_stops_km == [5.3, 9.1, 14.5]
     assert template.race_model == "half_marathon"
+
+
+def test_get_curated_event_returns_new_marathon_and_ultra_metadata(tmp_path: Path) -> None:
+    course_dir = tmp_path / "semi-marathon-finistere"
+    course_dir.mkdir()
+    (course_dir / "marathon-des-etoiles-de-la-baie.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+    (course_dir / "trail-de-l-odet-ultra.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+
+    marathon_event = get_curated_event(tmp_path, "marathon-etoiles-baie")
+    ultra_event = get_curated_event(tmp_path, "trail-odet-ultra")
+
+    assert marathon_event.template_id == "road_marathon"
+    assert marathon_event.race_model == "road_marathon"
+    assert ultra_event.template_id == "trail_ultra"
+    assert ultra_event.race_model == "technical_trail_ultra"
 
 
 def test_builtin_course_preserves_event_and_template_metadata(tmp_path: Path) -> None:

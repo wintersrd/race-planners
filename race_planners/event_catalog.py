@@ -93,6 +93,26 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             race_model="technical_trail_ultra",
             terrain="trail",
         ),
+        CuratedEvent(
+            event_id="marathon-etoiles-baie",
+            name="Marathon des Etoiles de la Baie",
+            short_name="Etoiles Marathon",
+            template_id="road_marathon",
+            course_id="marathon-etoiles-baie",
+            gpx_relative_path=Path("semi-marathon-finistere/marathon-des-etoiles-de-la-baie.gpx"),
+            race_model="road_marathon",
+            terrain="road",
+        ),
+        CuratedEvent(
+            event_id="trail-odet-ultra",
+            name="Trail de l'Odet Ultra",
+            short_name="Odet Ultra",
+            template_id="trail_ultra",
+            course_id="trail-odet-ultra",
+            gpx_relative_path=Path("semi-marathon-finistere/trail-de-l-odet-ultra.gpx"),
+            race_model="technical_trail_ultra",
+            terrain="trail",
+        ),
     )
 
 
