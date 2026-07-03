@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<gpx version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+<gpx version="1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xmlns="http://www.topografix.com/GPX/1/1"
-    xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd" 
+    xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd"
     creator="WeRun - https://werun.world" >	<trk>
 	                   <name>WeRun-22061687</name>
 						<trkseg>

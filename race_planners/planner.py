@@ -398,10 +398,18 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         assumptions.append("Pacing bias progressively shifts pace across the course.")
     if not _is_road_race_model(config.race_model) and any(_fade_profile_values(config)):
         assumptions.append("Fade profile progressively slows pace across the event.")
-    if config.rpe_target is not None and config.rpe_target != 6.0:
-        assumptions.append("RPE aggressiveness nudges pacing more conservatively or aggressively.")
-    if config.hr_cap is not None and config.hr_cap != 155:
-        assumptions.append("HR guardrail tempers pacing on steeper or later-course segments.")
+    if config.effort_policy is not None and config.effort_policy != "steady":
+        assumptions.append("Effort policy nudges pacing more conservatively or aggressively.")
+    elif config.rpe_target is not None and config.rpe_target != 6.0:
+        assumptions.append("Effort policy nudges pacing more conservatively or aggressively.")
+    if config.use_hr_guardrail and config.hr_cap is not None:
+        assumptions.append(
+            "Derived HR guardrail tempers pacing on steeper or later-course segments."
+        )
+    elif config.hr_cap is not None and config.hr_cap != 155:
+        assumptions.append(
+            "Derived HR guardrail tempers pacing on steeper or later-course segments."
+        )
 
     return PlanResult(
         splits=splits,

@@ -196,7 +196,7 @@ def test_climb_hike_threshold_meaningfully_changes_grf92_finish_time() -> None:
     assert low_threshold.total_time_min - high_threshold.total_time_min > 3.0
 
 
-def test_rpe_aggressiveness_changes_grf92_finish_time() -> None:
+def test_effort_policy_changes_grf92_finish_time() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     course = get_course_by_id(repo_root, "grf92")
     loaded = load_course_trackpoints(course)
@@ -210,6 +210,7 @@ def test_rpe_aggressiveness_changes_grf92_finish_time() -> None:
             hike_pace_min_km=13.0,
             climb_hike_threshold_percent=12.0,
             descent_caution="medium",
+            effort_policy="conservative",
             rpe_target=3.0,
         ),
     )
@@ -222,13 +223,14 @@ def test_rpe_aggressiveness_changes_grf92_finish_time() -> None:
             hike_pace_min_km=13.0,
             climb_hike_threshold_percent=12.0,
             descent_caution="medium",
+            effort_policy="aggressive",
             rpe_target=9.0,
         ),
     )
 
     assert conservative.total_time_min > aggressive.total_time_min
     assert (
-        "RPE aggressiveness nudges pacing more conservatively or aggressively."
+        "Effort policy nudges pacing more conservatively or aggressively."
         in conservative.assumptions
     )
 
@@ -247,6 +249,7 @@ def test_hr_guardrail_changes_grf92_finish_time() -> None:
             hike_pace_min_km=13.0,
             climb_hike_threshold_percent=12.0,
             descent_caution="medium",
+            use_hr_guardrail=True,
             hr_cap=130,
         ),
     )
@@ -259,13 +262,15 @@ def test_hr_guardrail_changes_grf92_finish_time() -> None:
             hike_pace_min_km=13.0,
             climb_hike_threshold_percent=12.0,
             descent_caution="medium",
+            use_hr_guardrail=True,
             hr_cap=180,
         ),
     )
 
     assert lower_cap.total_time_min > higher_cap.total_time_min
     assert (
-        "HR guardrail tempers pacing on steeper or later-course segments." in lower_cap.assumptions
+        "Derived HR guardrail tempers pacing on steeper or later-course segments."
+        in lower_cap.assumptions
     )
 
 

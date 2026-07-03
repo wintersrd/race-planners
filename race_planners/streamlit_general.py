@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import json
 from pathlib import Path
 from typing import Any
 
@@ -44,9 +45,25 @@ FADE_PROFILE_PRESETS: dict[str, tuple[str, tuple[float, float, float]]] = {
     "blow_up_risk": ("Blow-Up Risk", (1.5, 4.0, 7.0)),
 }
 
+EFFORT_POLICY_PRESETS: dict[str, tuple[str, float]] = {
+    "conservative": ("Conservative", 4.5),
+    "steady": ("Steady", 6.0),
+    "aggressive": ("Aggressive", 7.5),
+}
+
 
 def _default_athlete_profile() -> dict[str, Any]:
     return asdict(AthleteProfile())
+
+
+def _normalized_athlete_profile(profile: dict[str, Any] | None) -> dict[str, Any]:
+    normalized = _default_athlete_profile()
+    if profile is None:
+        return normalized
+    for key in normalized:
+        if key in profile:
+            normalized[key] = profile[key]
+    return normalized
 
 
 def _is_road_event(event: CuratedEvent) -> bool:
@@ -108,6 +125,64 @@ def _trail_anchor_defaults_from_profile(
     return round(flat_pace_min_km, 2), round(hike_pace_min_km, 2)
 
 
+def _road_anchor_default_from_profile(
+    athlete_profile: dict[str, Any], race_model: str
+) -> float | None:
+    lt1_pace = athlete_profile.get("lt1_pace_min_km")
+    if lt1_pace is None:
+        return None
+
+    lt1 = float(lt1_pace)
+    lt2_pace = athlete_profile.get("lt2_pace_min_km")
+    if race_model == "half_marathon" and lt2_pace is not None:
+        lt2 = float(lt2_pace)
+        return round((lt1 * 0.7) + (lt2 * 0.3), 2)
+
+    return round(lt1, 2)
+
+
+def _derived_effort_policy(profile: dict[str, Any]) -> str:
+    return str(profile.get("default_trail_effort_policy") or "steady")
+
+
+def _derived_fade_preset(profile: dict[str, Any]) -> str:
+    return str(profile.get("default_trail_fade_preset") or "progressive_fade")
+
+
+def _derived_split_bias(profile: dict[str, Any]) -> float:
+    return float(profile.get("default_road_split_bias") or 0.0)
+
+
+def _derived_hr_guardrail_cap(
+    athlete_profile: dict[str, Any], race_model: str, effort_policy: str
+) -> int | None:
+    lt1_hr = athlete_profile.get("lt1_hr")
+    lt2_hr = athlete_profile.get("lt2_hr")
+    if lt1_hr is None or lt2_hr is None:
+        return None
+
+    lt1 = int(lt1_hr)
+    lt2 = int(lt2_hr)
+    delta = max(lt2 - lt1, 0)
+    if race_model == "technical_trail_ultra":
+        base = lt1 + (delta * 0.2)
+    elif race_model == "fire_road_ultra":
+        base = lt1 + (delta * 0.3)
+    else:
+        base = lt1 + (delta * 0.45)
+
+    adjustment = {
+        "conservative": -3,
+        "steady": 0,
+        "aggressive": 3,
+    }.get(effort_policy, 0)
+    return int(round(base + adjustment))
+
+
+def _athlete_profile_json(profile: dict[str, Any]) -> str:
+    return json.dumps(profile, indent=2, sort_keys=True)
+
+
 def _plot_course_profile(trackpoints: list[Any], aid_distances_km: list[float]) -> Figure:
     fig, ax = plt.subplots(figsize=(12, 4))
     distances_km = [point.distance_from_start / 1000 for point in trackpoints]
@@ -156,6 +231,8 @@ def _default_config() -> dict[str, Any]:
         "fade_early_bias": None,
         "fade_mid_bias": None,
         "fade_late_bias": None,
+        "effort_policy": None,
+        "use_hr_guardrail": False,
         "rpe_target": None,
         "hr_cap": None,
     }
@@ -172,14 +249,33 @@ def _default_config_for_event(
     if event.race_model == "half_marathon":
         config["target_finish_time_min"] = 105.0
         config["rest_duration_sec"] = 10
+        config["marathon_pace_min_km"] = _road_anchor_default_from_profile(
+            athlete_profile,
+            event.race_model,
+        )
+        config["pacing_bias"] = _derived_split_bias(athlete_profile)
     elif event.race_model == "road_marathon":
         config["target_finish_time_min"] = 240.0
         config["rest_duration_sec"] = 15
+        config["marathon_pace_min_km"] = _road_anchor_default_from_profile(
+            athlete_profile,
+            event.race_model,
+        )
+        config["pacing_bias"] = _derived_split_bias(athlete_profile)
     else:
         config["input_mode"] = "effort_anchor"
         config["target_finish_time_min"] = None
         config["rest_duration_sec"] = 180
-        config["fade_profile_preset"] = "progressive_fade"
+        config["fade_profile_preset"] = _derived_fade_preset(athlete_profile)
+        config["effort_policy"] = _derived_effort_policy(athlete_profile)
+        config["use_hr_guardrail"] = (
+            _derived_hr_guardrail_cap(
+                athlete_profile,
+                event.race_model,
+                config["effort_policy"],
+            )
+            is not None
+        )
         if event.race_model == "fire_road_ultra":
             config["z1_pace_min_km"] = athlete_profile.get("lt1_pace_min_km") or 8.0
             config["z2_pace_min_km"] = athlete_profile.get("lt2_pace_min_km") or 7.0
@@ -245,7 +341,7 @@ def render_general_planner(repo_root: Path) -> None:
 
     selected_course: Any | None = None
     cfg = st.session_state["general_config"]
-    athlete_profile = dict(st.session_state["general_athlete_profile"])
+    athlete_profile = _normalized_athlete_profile(st.session_state["general_athlete_profile"])
     race_model = ""
 
     target_finish_time_min: float | None = None
@@ -259,6 +355,9 @@ def render_general_planner(repo_root: Path) -> None:
     pacing_bias = float(cfg.get("pacing_bias", 0.0))
     fade_profile_preset = str(cfg.get("fade_profile_preset") or "stable")
     fade_early_bias, fade_mid_bias, fade_late_bias = _fade_profile_values(cfg)
+    effort_policy = str(cfg.get("effort_policy") or _derived_effort_policy(athlete_profile))
+    use_hr_guardrail = bool(cfg.get("use_hr_guardrail", False))
+    derived_hr_cap: int | None = None
     rest_duration_sec = int(cfg.get("rest_duration_sec", 30))
 
     with st.sidebar:
@@ -287,7 +386,9 @@ def render_general_planner(repo_root: Path) -> None:
                         ]
                     st.success("Plan loaded. Review values and click Calculate.")
                     cfg = st.session_state["general_config"]
-                    athlete_profile = dict(st.session_state["general_athlete_profile"])
+                    athlete_profile = _normalized_athlete_profile(
+                        st.session_state["general_athlete_profile"]
+                    )
 
         selected_event = st.selectbox(
             "Event",
@@ -469,51 +570,135 @@ def render_general_planner(repo_root: Path) -> None:
             )
             rest_duration_sec = int(rest_duration_min * 60)
 
-            with st.expander("Athlete Profile (Optional)"):
-                st.caption(
-                    "Saved in plan JSON and used to seed trail defaults. Leave fields blank if unknown."
-                )
-                lt1_hr_raw = st.text_input("LT1 HR", _profile_text(athlete_profile, "lt1_hr"))
-                lt2_hr_raw = st.text_input("LT2 HR", _profile_text(athlete_profile, "lt2_hr"))
-                lt1_hr_value = _parse_optional_number(lt1_hr_raw)
-                lt2_hr_value = _parse_optional_number(lt2_hr_raw)
-                athlete_profile["lt1_hr"] = int(lt1_hr_value) if lt1_hr_value is not None else None
-                athlete_profile["lt2_hr"] = int(lt2_hr_value) if lt2_hr_value is not None else None
-                athlete_profile["lt1_pace_min_km"] = _parse_optional_number(
-                    st.text_input(
-                        "LT1 Road Pace (min/km)",
-                        _profile_text(athlete_profile, "lt1_pace_min_km"),
+        with st.expander("Athlete Profile"):
+            st.caption(
+                "Optional runner baselines used to seed defaults and derive advanced trail effort behavior. Saved in plan JSON."
+            )
+            uploaded_profile_json = st.file_uploader(
+                "Athlete Profile JSON",
+                type=["json"],
+                key="athlete_profile_json_uploader",
+            )
+            if uploaded_profile_json is not None:
+                try:
+                    athlete_profile = _normalized_athlete_profile(
+                        json.loads(uploaded_profile_json.getvalue().decode("utf-8"))
                     )
-                )
-                athlete_profile["lt2_pace_min_km"] = _parse_optional_number(
-                    st.text_input(
-                        "LT2 Road Pace (min/km)",
-                        _profile_text(athlete_profile, "lt2_pace_min_km"),
-                    )
-                )
-                athlete_profile["flat_trail_slowdown_sec_km"] = _parse_optional_number(
-                    st.text_input(
-                        "Flat Trail Slowdown vs Road (sec/km)",
-                        _profile_text(athlete_profile, "flat_trail_slowdown_sec_km"),
-                    )
-                )
-                athlete_profile["technical_trail_slowdown_sec_km"] = _parse_optional_number(
-                    st.text_input(
-                        "Technical Trail Slowdown vs Road (sec/km)",
-                        _profile_text(athlete_profile, "technical_trail_slowdown_sec_km"),
-                    )
-                )
+                    st.session_state["general_athlete_profile"] = athlete_profile
+                    st.success("Athlete profile loaded.")
+                except json.JSONDecodeError:
+                    st.error("Could not parse athlete profile JSON.")
 
-                suggested_flat_pace_min_km, suggested_hike_pace_min_km = (
-                    _trail_anchor_defaults_from_profile(
-                        athlete_profile,
-                        race_model,
-                    )
+            st.markdown("#### Road Baselines")
+            lt1_hr_raw = st.text_input("LT1 HR", _profile_text(athlete_profile, "lt1_hr"))
+            lt2_hr_raw = st.text_input("LT2 HR", _profile_text(athlete_profile, "lt2_hr"))
+            lt1_hr_value = _parse_optional_number(lt1_hr_raw)
+            lt2_hr_value = _parse_optional_number(lt2_hr_raw)
+            athlete_profile["lt1_hr"] = int(lt1_hr_value) if lt1_hr_value is not None else None
+            athlete_profile["lt2_hr"] = int(lt2_hr_value) if lt2_hr_value is not None else None
+            athlete_profile["lt1_pace_min_km"] = _parse_optional_number(
+                st.text_input(
+                    "LT1 Road Pace (min/km)",
+                    _profile_text(athlete_profile, "lt1_pace_min_km"),
+                    help="Aerobic threshold pace on runnable road terrain.",
                 )
-                if suggested_flat_pace_min_km is not None:
-                    st.caption(
-                        f"Profile-derived trail anchor suggestion: {suggested_flat_pace_min_km:.2f} min/km flat, {suggested_hike_pace_min_km:.2f} min/km hike."
+            )
+            athlete_profile["lt2_pace_min_km"] = _parse_optional_number(
+                st.text_input(
+                    "LT2 Road Pace (min/km)",
+                    _profile_text(athlete_profile, "lt2_pace_min_km"),
+                    help="Threshold pace on runnable road terrain.",
+                )
+            )
+
+            st.markdown("#### Trail Adjustments")
+            athlete_profile["flat_trail_slowdown_sec_km"] = _parse_optional_number(
+                st.text_input(
+                    "Flat Trail Slowdown vs Road (sec/km)",
+                    _profile_text(athlete_profile, "flat_trail_slowdown_sec_km"),
+                    help="How much slower flat trail is for you compared with road pace.",
+                )
+            )
+            athlete_profile["technical_trail_slowdown_sec_km"] = _parse_optional_number(
+                st.text_input(
+                    "Technical Trail Slowdown vs Road (sec/km)",
+                    _profile_text(athlete_profile, "technical_trail_slowdown_sec_km"),
+                    help="Extra slowdown on technical trail compared with road pace.",
+                )
+            )
+
+            st.markdown("#### Preferences")
+            athlete_profile["default_road_split_bias"] = st.slider(
+                "Default Road Split Bias",
+                min_value=-10.0,
+                max_value=10.0,
+                value=float(athlete_profile.get("default_road_split_bias") or 0.0),
+                step=0.5,
+                help="Saved default split tendency for road events.",
+            )
+            athlete_profile["default_trail_fade_preset"] = st.selectbox(
+                "Default Trail Fade Profile",
+                options=list(FADE_PROFILE_PRESETS.keys()),
+                index=list(FADE_PROFILE_PRESETS.keys()).index(
+                    _derived_fade_preset(athlete_profile)
+                ),
+                format_func=lambda key: FADE_PROFILE_PRESETS[key][0],
+            )
+            athlete_profile["default_trail_effort_policy"] = st.selectbox(
+                "Default Trail Effort Policy",
+                options=list(EFFORT_POLICY_PRESETS.keys()),
+                index=list(EFFORT_POLICY_PRESETS.keys()).index(
+                    _derived_effort_policy(athlete_profile)
+                ),
+                format_func=lambda key: EFFORT_POLICY_PRESETS[key][0],
+            )
+
+            st.download_button(
+                "Download Athlete Profile JSON",
+                data=_athlete_profile_json(athlete_profile),
+                file_name="athlete-profile.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+            if st.button("Apply Profile Defaults To This Event", use_container_width=True):
+                st.session_state["general_athlete_profile"] = athlete_profile
+                st.session_state["general_config"] = _default_config_for_event(
+                    selected_event,
+                    athlete_profile,
+                )
+                st.session_state.pop("general_result", None)
+                st.session_state.pop("general_selected_course", None)
+                st.session_state.pop("general_loaded_course", None)
+                st.rerun()
+
+        if _is_trail_event(selected_event):
+            with st.expander("Advanced Trail Controls"):
+                effort_policy = st.selectbox(
+                    "Effort Policy",
+                    options=list(EFFORT_POLICY_PRESETS.keys()),
+                    index=list(EFFORT_POLICY_PRESETS.keys()).index(
+                        str(cfg.get("effort_policy") or _derived_effort_policy(athlete_profile))
+                    ),
+                    format_func=lambda key: EFFORT_POLICY_PRESETS[key][0],
+                    help="High-level pacing attitude for the day. Conservative protects later durability, aggressive leans into earlier pace.",
+                )
+                derived_hr_cap = _derived_hr_guardrail_cap(
+                    athlete_profile,
+                    race_model,
+                    effort_policy,
+                )
+                if derived_hr_cap is None:
+                    use_hr_guardrail = False
+                    st.info(
+                        "Add LT1 and LT2 heart-rate values in the athlete profile to enable a derived HR guardrail."
                     )
+                else:
+                    use_hr_guardrail = st.checkbox(
+                        "Use Derived HR Guardrail",
+                        value=bool(cfg.get("use_hr_guardrail", True)),
+                        help="Uses your LT1/LT2 profile to temper pacing on steep or late-race trail segments.",
+                    )
+                    st.caption(f"Derived guardrail cap for this event: {derived_hr_cap} bpm")
 
         calculate_plan_clicked = st.button(
             "Calculate Plan", type="primary", use_container_width=True
@@ -560,11 +745,15 @@ def render_general_planner(repo_root: Path) -> None:
         fade_early_bias=None if _is_road_event(selected_event) else fade_early_bias,
         fade_mid_bias=None if _is_road_event(selected_event) else fade_mid_bias,
         fade_late_bias=None if _is_road_event(selected_event) else fade_late_bias,
-        rpe_target=None,
-        hr_cap=None,
+        effort_policy=None if _is_road_event(selected_event) else effort_policy,
+        use_hr_guardrail=False if _is_road_event(selected_event) else use_hr_guardrail,
+        rpe_target=(
+            None if _is_road_event(selected_event) else EFFORT_POLICY_PRESETS[effort_policy][1]
+        ),
+        hr_cap=(None if _is_road_event(selected_event) or not use_hr_guardrail else derived_hr_cap),
     )
     st.session_state["general_config"] = asdict(new_config)
-    st.session_state["general_athlete_profile"] = athlete_profile
+    st.session_state["general_athlete_profile"] = _normalized_athlete_profile(athlete_profile)
 
     if calculate_plan_clicked:
         loaded = load_course_trackpoints(selected_course)

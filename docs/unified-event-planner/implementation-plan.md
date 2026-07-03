@@ -115,6 +115,18 @@ Status: In progress
   - removed technical metadata such as model and GPX filename from the primary
     planner surface and replaced it with plain-language help text tied to the
     visible controls
+- Athlete profile integration completed:
+  - promoted the athlete profile into a first-class saved object with road
+    baselines, trail adjustments, and saved preference fields for split bias,
+    fade preset, and default trail effort policy
+  - added athlete-profile JSON import/export plus an explicit "apply profile
+    defaults to this event" flow so saved baselines can be reused without hidden
+    state magic
+  - used athlete profile data to derive smarter road and trail anchor defaults,
+    trail fade preset defaults, and optional derived HR-guardrail behavior
+  - replaced raw user-facing RPE/HR controls with higher-level trail effort
+    policy and derived guardrail behavior while preserving backend flexibility
+    through the canonical planner config
 
 ## Objective
 

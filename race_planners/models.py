@@ -78,6 +78,9 @@ class AthleteProfile:
     lt2_pace_min_km: float | None = None
     flat_trail_slowdown_sec_km: float | None = None
     technical_trail_slowdown_sec_km: float | None = None
+    default_road_split_bias: float | None = None
+    default_trail_fade_preset: str | None = None
+    default_trail_effort_policy: str | None = None
 
 
 @dataclass
@@ -98,6 +101,8 @@ class PacingConfig:
     fade_early_bias: float | None = None
     fade_mid_bias: float | None = None
     fade_late_bias: float | None = None
+    effort_policy: str | None = None
+    use_hr_guardrail: bool = False
     rpe_target: float | None = None
     hr_cap: int | None = None
 

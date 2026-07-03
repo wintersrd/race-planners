@@ -6,6 +6,7 @@ from race_planners.plan_io import export_plan_json
 from race_planners.streamlit_general import (
     _course_overview_rows,
     _default_config_for_event,
+    _derived_hr_guardrail_cap,
     load_plan_into_state,
 )
 
@@ -122,9 +123,45 @@ def test_default_config_for_trail_event_uses_athlete_profile_defaults(tmp_path: 
         {
             "lt1_pace_min_km": 5.0,
             "technical_trail_slowdown_sec_km": 45.0,
+            "default_trail_fade_preset": "late_fade",
+            "default_trail_effort_policy": "conservative",
+            "lt1_hr": 152,
+            "lt2_hr": 170,
         },
     )
 
-    assert config["fade_profile_preset"] == "progressive_fade"
+    assert config["fade_profile_preset"] == "late_fade"
+    assert config["effort_policy"] == "conservative"
+    assert config["use_hr_guardrail"] is True
     assert config["flat_pace_min_km"] == 5.75
     assert config["hike_pace_min_km"] == 9.75
+
+
+def test_default_config_for_road_event_uses_profile_split_bias(tmp_path: Path) -> None:
+    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
+    (tmp_path / "semi-marathon-finistere" / "semi-marathon-du-finistere.gpx").write_text(
+        "<gpx></gpx>", encoding="utf-8"
+    )
+    event = get_curated_event(tmp_path, "semi-marathon-finistere")
+
+    config = _default_config_for_event(
+        event,
+        {
+            "lt1_pace_min_km": 5.0,
+            "lt2_pace_min_km": 4.25,
+            "default_road_split_bias": -2.5,
+        },
+    )
+
+    assert config["marathon_pace_min_km"] == 4.78
+    assert config["pacing_bias"] == -2.5
+
+
+def test_derived_hr_guardrail_cap_uses_profile_and_policy() -> None:
+    guardrail = _derived_hr_guardrail_cap(
+        {"lt1_hr": 152, "lt2_hr": 170},
+        "technical_trail_ultra",
+        "conservative",
+    )
+
+    assert guardrail == 153
