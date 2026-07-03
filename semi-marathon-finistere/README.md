@@ -1,6 +1,9 @@
-# Race Planner: Semi-Marathon du Finistère
+# Race Planner: Unified Event Planner Entry
 
-A bilingual (English/French) interactive race pacing tool for the Semi-Marathon du Finistère.
+The active Streamlit entry in this directory now launches the repository's
+unified event planner. The original Semi-Marathon du Finistère logic and the
+notebook remain in the repository for compatibility, reference, and regression
+testing.
 
 ## Development Environment (Repository Standard)
 
@@ -25,7 +28,10 @@ Do not hand-edit `semi-marathon-finistere/requirements.txt`.
 
 ### Overview
 
-This tool helps runners plan their race strategy for the Semi-Marathon du Finistère (21.1 km with ~153m elevation gain). It uses **Grade-Adjusted Pace (GAP)** to account for elevation changes, providing realistic pace targets for each kilometer.
+This repository now serves a curated event-first planning flow through the
+Streamlit app in this directory. It still includes the original Semi-Marathon du
+Finistère material, but the active app experience is no longer split between
+legacy and beta planner modes.
 
 Two versions are available:
 
@@ -43,16 +49,9 @@ Two versions are available:
 - Elevation profile visualization
 - Per-kilometer pace breakdown
 
-### Planner Modes
+### Unified Planner Highlights
 
-The Streamlit app now includes a mode switch at the top:
-
-- **Legacy Half Marathon**: original Semi-Marathon du Finistère planner flow
-- **General Planner (Beta)**: broader planner with pluggable models and local course library
-
-#### General Planner (Beta) highlights
-
-- Built-in local course library plus GPX upload support
+- Curated event-first selection
 - Race models:
   - `half_marathon`
   - `road_marathon`
@@ -62,8 +61,10 @@ The Streamlit app now includes a mode switch at the top:
   - `finish_time`
   - `effort_anchor`
 - JSON plan export/import
+- Repository-backed curated GPX files for supported events
 
-If a saved plan references a GPX file that is not available locally, the app shows an explicit recovery error and asks for GPX upload.
+If a saved plan references a curated GPX file that is not available locally,
+restore the file in the repository and retry.
 
 ### Quick Start
 
@@ -134,16 +135,11 @@ Then run all cells (Cell → Run All) to activate the interactive widgets.
 
 ### How to Use
 
-1. **Select your language** (English or French) using the dropdown
-2. **Choose input mode:** Target finish time OR target average pace
-3. **Enter your goal** (e.g., `01:45:00` for finish time or `05:00` for pace per km)
-4. **Adjust power fade:**
-   - Negative values = negative split (slower start, faster finish)
-   - Positive values = positive split (faster start, slower finish)
-   - Zero = even pacing
-5. **Set rest duration** (seconds per water station)
-6. **Click "Calculate Pacing"** to see your personalized plan
-7. **Print or screenshot** the Quick Reference section for race day
+1. **Select a curated event**
+2. **Choose input mode:** finish time or effort anchor
+3. **Enter your target inputs** for the selected event template
+4. **Adjust pacing bias or rest assumptions** when relevant
+5. **Click "Calculate Plan"** to generate pacing, aid-station, and section outputs
 
 ---
 
@@ -151,7 +147,10 @@ Then run all cells (Cell → Run All) to activate the interactive widgets.
 
 ### Aperçu
 
-Cet outil aide les coureurs à planifier leur stratégie pour le Semi-Marathon du Finistère (21,1 km avec ~153m de dénivelé positif). Il utilise l'**Allure Ajustée au Dénivelé (GAP)** pour tenir compte des variations d'élévation, fournissant des objectifs d'allure réalistes pour chaque kilomètre.
+Cette application Streamlit sert maintenant de point d'entrée au planificateur
+unifié d'événements du dépôt. Le contenu historique du Semi-Marathon du
+Finistère reste présent pour compatibilité et référence, mais l'expérience
+active n'est plus séparée entre un mode legacy et un mode beta.
 
 Deux versions sont disponibles:
 
@@ -238,16 +237,12 @@ Puis exécutez toutes les cellules (Cell → Run All) pour activer les widgets i
 
 ### Comment Utiliser
 
-1. **Sélectionnez votre langue** (Anglais ou Français) avec le menu déroulant
-2. **Choisissez le mode de saisie:** Temps cible OU allure moyenne cible
-3. **Entrez votre objectif** (ex: `01:45:00` pour le temps ou `05:00` pour l'allure par km)
-4. **Ajustez la gestion d'effort:**
-   - Valeurs négatives = split négatif (départ lent, fin rapide)
-   - Valeurs positives = split positif (départ rapide, fin lente)
-   - Zéro = allure constante
-5. **Définissez la durée des ravitos** (secondes par station)
-6. **Cliquez "Calculer"** pour voir votre plan personnalisé
-7. **Imprimez ou capturez** la section Référence Rapide pour le jour de course
+1. **Sélectionnez un événement pris en charge**
+2. **Choisissez le mode de saisie:** temps cible ou ancrage d'effort
+3. **Entrez vos paramètres cibles** pour le modèle associé à l'événement
+4. **Ajustez si besoin** le biais d'allure ou la durée des arrêts aux ravitos
+5. **Cliquez sur "Calculate Plan"** pour générer les sorties d'allure, de
+   ravitaillement et de sections
 
 ---
 
@@ -275,15 +270,15 @@ voila
 
 ### Files / Fichiers
 
-| File                                         | Description                                           |
-| -------------------------------------------- | ----------------------------------------------------- |
-| `app.py`                                     | Streamlit web application / Application web Streamlit |
-| `race_planner_semi_marathon_finistere.ipynb` | Original Jupyter notebook / Notebook Jupyter original |
-| `WR-GPX-Semi-marathon-du-Finistere.gpx`      | Course GPX data / Données GPX du parcours             |
-| `requirements-streamlit.txt`                 | Streamlit dependencies / Dépendances Streamlit        |
-| `requirements.txt`                           | Voila dependencies / Dépendances Voila                |
-| `.streamlit/config.toml`                     | Streamlit configuration / Configuration Streamlit     |
-| `README.md`                                  | This file / Ce fichier                                |
+| File                                         | Description                                                    |
+| -------------------------------------------- | -------------------------------------------------------------- |
+| `app.py`                                     | Unified planner entry / Point d'entrée du planificateur unifié |
+| `race_planner_semi_marathon_finistere.ipynb` | Original Jupyter notebook / Notebook Jupyter original          |
+| `WR-GPX-Semi-marathon-du-Finistere.gpx`      | Course GPX data / Données GPX du parcours                      |
+| `requirements-streamlit.txt`                 | Streamlit dependencies / Dépendances Streamlit                 |
+| `requirements.txt`                           | Voila dependencies / Dépendances Voila                         |
+| `.streamlit/config.toml`                     | Streamlit configuration / Configuration Streamlit              |
+| `README.md`                                  | This file / Ce fichier                                         |
 
 ---
 

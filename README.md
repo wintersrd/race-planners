@@ -1,9 +1,7 @@
 # race-planners
 
-Race planning applications and tools, centered on a Streamlit app with two planner modes:
-
-- `Legacy Half Marathon`: original Semi-Marathon du Finistere experience
-- `General Planner (Beta)`: pluggable race models + local course library + JSON plan save/load
+Race planning applications and tools, centered on a single Streamlit-based
+unified event planner.
 
 ## Python and environment
 
@@ -30,14 +28,15 @@ Do not start the app with `uv run semi-marathon-finistere/app.py` as a normal Py
 
 If you do run the script directly, it now re-launches itself through Streamlit, but the supported command is still the `streamlit run` form above.
 
-In-app mode switch:
+The active app now presents one event-first planning flow:
 
-- `Legacy Half Marathon` keeps existing race-specific behavior and output tabs.
-- `General Planner (Beta)` supports:
-  - race models: `half_marathon`, `road_marathon`, `fire_road_ultra`, `technical_trail_ultra`
-  - input modes: `finish_time`, `effort_anchor`
-  - course sources: built-in local routes + GPX uploads persisted to `courses/uploads/`
-  - plan persistence: JSON download/reload (with explicit missing-GPX recovery message)
+- curated events currently include Finistere half marathon plus GRF56, GRF92,
+  and GRF166
+- race models currently include `half_marathon`, `road_marathon`,
+  `fire_road_ultra`, and `technical_trail_ultra`
+- input modes supported across the unified planner are `finish_time` and
+  `effort_anchor`
+- plan persistence is available through JSON download/reload
 
 ## Quality commands
 
@@ -63,9 +62,10 @@ Do not hand-edit `semi-marathon-finistere/requirements.txt`.
 ## Repository conventions for courses and plans
 
 - Local route library root: `courses/`
-- Uploaded GPX files are persisted in `courses/uploads/`
-- Plan files are JSON exports from the app and can reference local GPX filenames
-- If a referenced GPX is missing on reload, the app asks for re-upload
+- Plan files are JSON exports from the app and can reference repository-backed
+  GPX filenames
+- If a referenced curated GPX is missing on reload, restore the file in the
+  repository before retrying
 
 ## Devcontainer
 

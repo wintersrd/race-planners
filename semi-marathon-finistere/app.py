@@ -1,8 +1,8 @@
-"""
-Semi-Marathon du Finistère Race Pacing App
-Streamlit version of the Jupyter notebook race planner
+"""Unified Event Planner Streamlit entrypoint.
 
-Run with: streamlit run app.py
+This file still contains the legacy Semi-Marathon du Finistere implementation
+for compatibility and regression testing, but the active app entry flow now
+delegates to the unified event planner.
 """
 
 import math
@@ -37,7 +37,7 @@ def ensure_streamlit_runtime() -> None:
 def configure_page() -> None:
     """Configure page metadata and shared styling once Streamlit is active."""
     st.set_page_config(
-        page_title="Half Marathon Race Pacing",
+        page_title="Unified Event Planner",
         page_icon="🏃‍♀️",
         layout="wide",
         initial_sidebar_state="expanded",

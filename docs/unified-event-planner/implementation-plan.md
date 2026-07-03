@@ -80,6 +80,15 @@ Status: In progress
     UI to align the app with the curated event-only product direction
   - added helper-level coverage for the new course overview rendering inputs and
     preserved app compile coverage for the updated single-entry Streamlit shell
+- Phase 8 completed:
+  - cleaned repository-facing README text so the project no longer describes the
+    removed two-planner split as the active product model
+  - updated the `semi-marathon-finistere` app entry metadata and local README to
+    describe the unified planner as the active Streamlit experience while
+    clarifying that legacy notebook/app logic remains for compatibility and
+    regression coverage
+  - removed remaining active-product references to GPX re-upload guidance in the
+    main README in favor of repository-backed curated course restoration wording
 
 ## Objective
 
