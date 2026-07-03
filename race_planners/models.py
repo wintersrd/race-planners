@@ -108,6 +108,8 @@ class SegmentSummary:
     avg_grade_percent: float
     avg_pace_min_km: float
     segment_time_min: float
+    block_label: str = ""
+    section_name: str = ""
 
 
 @dataclass

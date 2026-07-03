@@ -350,6 +350,8 @@ def render_general_planner(repo_root: Path) -> None:
         st.dataframe(
             [
                 {
+                    "section": segment.section_name or segment.segment_type,
+                    "block": segment.block_label,
                     "type": segment.segment_type,
                     "start_km": round(segment.start_km, 2),
                     "end_km": round(segment.end_km, 2),

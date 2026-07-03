@@ -57,6 +57,17 @@ Status: In progress
     aid-station timing, and richer segment timing summaries
   - added regression coverage for additive rest timing, typed aid-station ETAs,
     pacing-bias behavior, and updated legacy compatibility expectations
+- Phase 6 completed:
+  - changed segment generation to respect aid-station boundaries as hard section
+    breaks before applying terrain-based grouping
+  - added block-aware section labels such as `Start to Aid 1` and
+    `Aid 1 to Finish` so downstream UI can present race-meaningful guidance
+    without re-deriving structure in the app layer
+  - kept terrain grouping dynamic inside each aid block by clipping kilometer
+    splits to the block boundaries before merging adjacent split types
+  - updated beta planner segment output to include derived section and block
+    labels
+  - added regression coverage for aid-boundary-aware segment generation
 
 ## Objective
 
