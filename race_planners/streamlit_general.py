@@ -15,7 +15,13 @@ from race_planners.fueling import build_fueling_plan
 from race_planners.grade import elevation_changes
 from race_planners.i18n import AVAILABLE_LOCALES, DEFAULT_LOCALE, t
 from race_planners.models import CuratedEvent, PacingConfig
-from race_planners.plots import plot_course_profile, plot_pace_profile
+from race_planners.plots import (
+    plot_course_profile,
+    plot_cumulative_time,
+    plot_half_comparison,
+    plot_pace_profile,
+    plot_terrain_breakdown,
+)
 from race_planners.plan_io import export_plan_json, load_plan_into_state
 from race_planners.planner import calculate_plan, load_course_trackpoints
 from race_planners.profile import (
@@ -596,6 +602,35 @@ def render_general_planner(repo_root: Path) -> None:
             t("button.calculate", locale), type="primary", use_container_width=True
         )
 
+        st.markdown("---")
+        with st.expander(t("sidebar.user_guide", locale)):
+            st.markdown(t("app.how_to_use_body", locale))
+        with st.expander(t("sidebar.technical_models", locale)):
+            if locale == "fr":
+                st.markdown(
+                    "**Capacité sur Route** — Estime votre temps optimal à partir des allures LT1/LT2 "
+                    "puis ajuste selon le dénivelé et la météo.\n\n"
+                    "**Pénalité de Chaleur** — Applique une pénalité d'allure basée sur la température, "
+                    "avec une courbe diurne.\n\n"
+                    "**Durabilité** — Ralentit l'allure proportionnellement à la distance et à la durée.\n\n"
+                    "**Garde-fou FC** — Estime la FC par segment et ralentit si elle dépasse un "
+                    "plafond dynamique.\n\n"
+                    "**Nutrition** — Calcule les dépenses caloriques (~1 kcal/kg/km + coût Minetti), "
+                    "les cibles glucidiques et l'hydratation.\n\n"
+                )
+            else:
+                st.markdown(
+                    "**Road Capability** — Estimates your best-likely time from LT1/LT2 paces, "
+                    "then adjusts for course difficulty and weather.\n\n"
+                    "**Heat Penalty** — Applies a pace penalty based on temperature, with a "
+                    "diurnal curve across the event.\n\n"
+                    "**Durability** — Slows pace proportionally to distance and duration.\n\n"
+                    "**HR Guardrail** — Estimates segment HR and slows pace if it exceeds a "
+                    "dynamic ceiling.\n\n"
+                    "**Fueling** — Calculates calorie expenditure (~1 kcal/kg/km + Minetti grade cost), "
+                    "carb targets, and hydration.\n\n"
+                )
+
     if selected_course is None:
         st.error(t("msg.event_not_resolved", locale))
         return
@@ -845,15 +880,18 @@ def render_general_planner(repo_root: Path) -> None:
             for warning in result.warnings:
                 st.warning(_translate_message(warning, locale))
 
-        tab_summary, tab_profile, tab_aid, tab_sections, tab_fueling, tab_splits = st.tabs(
-            [
-                t("tab.summary", locale),
-                t("tab.course_profile", locale),
-                t("tab.aid_stations", locale),
-                t("tab.sections", locale),
-                t("tab.fueling", locale),
-                t("tab.splits", locale),
-            ]
+        tab_summary, tab_profile, tab_aid, tab_sections, tab_fueling, tab_splits, tab_analysis = (
+            st.tabs(
+                [
+                    t("tab.summary", locale),
+                    t("tab.course_profile", locale),
+                    t("tab.aid_stations", locale),
+                    t("tab.sections", locale),
+                    t("tab.fueling", locale),
+                    t("tab.splits", locale),
+                    t("section.split_analysis", locale).replace("### ", ""),
+                ]
+            )
         )
 
         with tab_summary:
@@ -891,6 +929,7 @@ def render_general_planner(repo_root: Path) -> None:
         with tab_profile:
             st.pyplot(plot_course_profile(loaded_course.trackpoints, chosen_course.aid_stops_km))
             st.pyplot(plot_pace_profile(result))
+            st.pyplot(plot_cumulative_time(result, selected_event))
 
         with tab_aid:
             if result.aid_station_etas:
@@ -1055,6 +1094,10 @@ def render_general_planner(repo_root: Path) -> None:
                 width="stretch",
                 hide_index=True,
             )
+
+        with tab_analysis:
+            st.pyplot(plot_half_comparison(result))
+            st.pyplot(plot_terrain_breakdown(result, locale))
 
         plan_json = export_plan_json(
             course_id=chosen_course.course_id,

@@ -268,6 +268,22 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "col.start_elapsed_short": "Start",
         # ── Download ─────────────────────────────────────────────────
         "button.download_plan": "Download plan JSON",
+        # ── Sidebar documentation expanders ──────────────────────────
+        "sidebar.user_guide": "User Guide",
+        "sidebar.technical_models": "How the Models Work",
+        # ── Split analysis ───────────────────────────────────────────
+        "section.split_analysis": "### Split Analysis",
+        "split.first_half": "1st Half",
+        "split.second_half": "2nd Half",
+        "split.time": "Time",
+        "split.pace": "Pace",
+        "split.diff": "Diff",
+        "split.terrain_breakdown": "Terrain Breakdown",
+        "split.climb": "Climb",
+        "split.flat": "Flat",
+        "split.descent": "Descent",
+        "split.distance": "Distance",
+        "split.cumulative_title": "Cumulative Time",
         # ── Preset labels ────────────────────────────────────────────
         "preset.fade.stable": "Stable",
         "preset.fade.late_fade": "Late Fade",
@@ -574,6 +590,22 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "col.start_elapsed_short": "Début",
         # ── Download ─────────────────────────────────────────────────
         "button.download_plan": "Télécharger le Plan JSON",
+        # ── Sidebar documentation expanders ──────────────────────────
+        "sidebar.user_guide": "Guide Utilisateur",
+        "sidebar.technical_models": "Comment Fonctionnent les Modèles",
+        # ── Split analysis ───────────────────────────────────────────
+        "section.split_analysis": "### Analyse des Splits",
+        "split.first_half": "1ère Moitié",
+        "split.second_half": "2ème Moitié",
+        "split.time": "Temps",
+        "split.pace": "Allure",
+        "split.diff": "Diff",
+        "split.terrain_breakdown": "Répartition par Terrain",
+        "split.climb": "Montée",
+        "split.flat": "Plat",
+        "split.descent": "Descente",
+        "split.distance": "Distance",
+        "split.cumulative_title": "Temps Cumulé",
         # ── Preset labels ────────────────────────────────────────────
         "preset.fade.stable": "Stable",
         "preset.fade.late_fade": "Dégradation Tardive",
