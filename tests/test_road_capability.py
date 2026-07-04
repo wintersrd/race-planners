@@ -96,9 +96,16 @@ def test_road_intent_target_time_and_labels_shift_with_intent() -> None:
     easy = estimate_road_intent_target_time_min(adjusted_best_likely_time_min, "easy_durable")
 
     assert best_effort < controlled < easy
-    assert classify_road_feasibility(adjusted_best_likely_time_min, easy) == "Very High"
-    assert classify_road_feasibility(adjusted_best_likely_time_min, best_effort) == "Stretch"
-    assert classify_road_effort_band(adjusted_best_likely_time_min, easy) == "Controlled"
-    assert classify_road_effort_band(adjusted_best_likely_time_min, best_effort) == "Near Limit"
-    assert classify_road_recovery_cost(adjusted_best_likely_time_min, easy) == "Low"
-    assert classify_road_recovery_cost(adjusted_best_likely_time_min, best_effort) == "High"
+    assert classify_road_feasibility(adjusted_best_likely_time_min, easy) == "feasibility.very_high"
+    assert (
+        classify_road_feasibility(adjusted_best_likely_time_min, best_effort)
+        == "feasibility.stretch"
+    )
+    assert classify_road_effort_band(adjusted_best_likely_time_min, easy) == "effort.controlled"
+    assert (
+        classify_road_effort_band(adjusted_best_likely_time_min, best_effort) == "effort.near_limit"
+    )
+    assert classify_road_recovery_cost(adjusted_best_likely_time_min, easy) == "recovery.low"
+    assert (
+        classify_road_recovery_cost(adjusted_best_likely_time_min, best_effort) == "recovery.high"
+    )

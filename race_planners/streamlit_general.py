@@ -58,6 +58,26 @@ def _aid_tier_label(tier: str, locale: str) -> str:
     return t(f"tier.{tier}", locale)
 
 
+def _translate_message(message: str, locale: str) -> str:
+    """Translate a domain-layer message key with optional inline kwargs.
+
+    Domain messages use the format ``key|arg1=val1,arg2=val2``.
+    Simple messages are just ``key``.
+    """
+    if "|" in message:
+        key, args_str = message.split("|", 1)
+        kwargs: dict[str, float] = {}
+        for pair in args_str.split(","):
+            if "=" in pair:
+                k, v = pair.split("=", 1)
+                try:
+                    kwargs[k.strip()] = float(v.strip())
+                except ValueError:
+                    kwargs[k.strip()] = 0.0
+        return t(key, locale, **kwargs)
+    return t(message, locale)
+
+
 def render_general_planner(repo_root: Path) -> None:
     st.session_state.setdefault("general_locale", DEFAULT_LOCALE)
     locale = st.session_state["general_locale"]
@@ -712,23 +732,32 @@ def render_general_planner(repo_root: Path) -> None:
                             },
                             {
                                 t("label.metric", locale): t("label.feasibility", locale),
-                                t("label.value", locale): classify_road_feasibility(
-                                    adjusted_capability["adjusted_time_min"],
-                                    chosen_target_time_min,
+                                t("label.value", locale): t(
+                                    classify_road_feasibility(
+                                        adjusted_capability["adjusted_time_min"],
+                                        chosen_target_time_min,
+                                    ),
+                                    locale,
                                 ),
                             },
                             {
                                 t("label.metric", locale): t("label.expected_effort", locale),
-                                t("label.value", locale): classify_road_effort_band(
-                                    adjusted_capability["adjusted_time_min"],
-                                    chosen_target_time_min,
+                                t("label.value", locale): t(
+                                    classify_road_effort_band(
+                                        adjusted_capability["adjusted_time_min"],
+                                        chosen_target_time_min,
+                                    ),
+                                    locale,
                                 ),
                             },
                             {
                                 t("label.metric", locale): t("label.recovery_cost", locale),
-                                t("label.value", locale): classify_road_recovery_cost(
-                                    adjusted_capability["adjusted_time_min"],
-                                    chosen_target_time_min,
+                                t("label.value", locale): t(
+                                    classify_road_recovery_cost(
+                                        adjusted_capability["adjusted_time_min"],
+                                        chosen_target_time_min,
+                                    ),
+                                    locale,
                                 ),
                             },
                         ]
@@ -810,10 +839,11 @@ def render_general_planner(repo_root: Path) -> None:
         )
         summary_e.metric(t("metric.avg_pace", locale), format_pace_minutes(average_pace_min_km))
         if result.assumptions:
-            st.caption(t("caption.assumptions", locale, assumptions=" | ".join(result.assumptions)))
+            translated = [_translate_message(a, locale) for a in result.assumptions]
+            st.caption(t("caption.assumptions", locale, assumptions=" | ".join(translated)))
         if result.warnings:
             for warning in result.warnings:
-                st.warning(warning)
+                st.warning(_translate_message(warning, locale))
 
         tab_summary, tab_profile, tab_aid, tab_sections, tab_fueling, tab_splits = st.tabs(
             [
@@ -966,7 +996,7 @@ def render_general_planner(repo_root: Path) -> None:
                 )
                 if fueling_plan.warnings:
                     for warning in fueling_plan.warnings:
-                        st.warning(warning)
+                        st.warning(_translate_message(warning, locale))
                 st.markdown(t("section.per_block_fueling", locale))
                 st.dataframe(
                     pd.DataFrame(

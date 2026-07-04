@@ -158,12 +158,12 @@ def classify_road_feasibility(
 ) -> str:
     delta_percent = road_target_delta_percent(adjusted_best_likely_time_min, chosen_target_time_min)
     if delta_percent >= 6.0:
-        return "Very High"
+        return "feasibility.very_high"
     if delta_percent >= 2.0:
-        return "Reasonable"
+        return "feasibility.reasonable"
     if delta_percent >= -1.5:
-        return "Stretch"
-    return "Aggressive"
+        return "feasibility.stretch"
+    return "feasibility.aggressive"
 
 
 def classify_road_effort_band(
@@ -171,12 +171,12 @@ def classify_road_effort_band(
 ) -> str:
     delta_percent = road_target_delta_percent(adjusted_best_likely_time_min, chosen_target_time_min)
     if delta_percent >= 8.0:
-        return "Controlled"
+        return "effort.controlled"
     if delta_percent >= 3.0:
-        return "Strong"
+        return "effort.strong"
     if delta_percent >= -1.0:
-        return "Near Limit"
-    return "Maximal"
+        return "effort.near_limit"
+    return "effort.maximal"
 
 
 def classify_road_recovery_cost(
@@ -184,9 +184,9 @@ def classify_road_recovery_cost(
 ) -> str:
     delta_percent = road_target_delta_percent(adjusted_best_likely_time_min, chosen_target_time_min)
     if delta_percent >= 8.0:
-        return "Low"
+        return "recovery.low"
     if delta_percent >= 3.0:
-        return "Moderate"
+        return "recovery.moderate"
     if delta_percent >= -1.0:
-        return "High"
-    return "Very High"
+        return "recovery.high"
+    return "recovery.very_high"

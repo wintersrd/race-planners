@@ -240,13 +240,9 @@ def build_fueling_plan(
     carb_deficit_g = max(total_carb_target_g - cumulative_carb_planned, 0.0)
     warnings: list[str] = []
     if duration_hr > 3.0 and carb_deficit_g > total_carb_target_g * 0.2:
-        warnings.append(
-            f"Planned carb intake falls {carb_deficit_g:.0f}g short of target. Consider increasing fueling frequency."
-        )
+        warnings.append(f"warning.carb_deficit|deficit={carb_deficit_g:.0f}")
     if duration_hr > 6.0:
-        warnings.append(
-            "Late-race gut stress may reduce absorption by 30-50%. Consider front-loading carb intake."
-        )
+        warnings.append("warning.gut_stress")
 
     return FuelingPlan(
         total_kcal=round(total_kcal, 1),

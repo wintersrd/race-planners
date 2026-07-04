@@ -409,31 +409,24 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
     assumptions: list[str] = []
     warnings: list[str] = []
     if aid_station_etas and config.rest_duration_sec > 0:
-        assumptions.append("Rest stops are modeled as fixed additive pauses.")
+        assumptions.append("assumption.rest_stops")
     if is_road_race_model(config.race_model) and config.pacing_bias != 0:
-        assumptions.append("Pacing bias progressively shifts pace across the course.")
+        assumptions.append("assumption.pacing_bias")
     if not is_road_race_model(config.race_model) and any(fade_profile_values(config)):
-        assumptions.append("Fade profile progressively slows pace across the event.")
+        assumptions.append("assumption.fade_profile")
     if config.effort_policy is not None and config.effort_policy != "steady":
-        assumptions.append("Effort policy nudges pacing more conservatively or aggressively.")
+        assumptions.append("assumption.effort_policy")
     elif config.rpe_target is not None and config.rpe_target != 6.0:
-        assumptions.append("Effort policy nudges pacing more conservatively or aggressively.")
+        assumptions.append("assumption.effort_policy")
     hr_strategy_summary = hr_guardrail_strategy_summary(config)
     if hr_strategy_summary is not None:
         assumptions.append(hr_strategy_summary)
     if config.use_hr_guardrail and config.hr_cap is not None:
-        assumptions.append(
-            "Derived HR guardrail tempers pacing on steeper or later-course segments."
-        )
+        assumptions.append("assumption.hr_guardrail")
     elif config.hr_cap is not None and config.hr_cap != 155:
-        assumptions.append(
-            "Derived HR guardrail tempers pacing on steeper or later-course segments."
-        )
+        assumptions.append("assumption.hr_guardrail")
     if config.peak_temperature_c is not None and config.peak_temperature_c > 10.0:
-        assumptions.append(
-            f"Weather model applies heat penalty using peak {config.peak_temperature_c:.0f}°C "
-            "with diurnal temperature variation across the event."
-        )
+        assumptions.append(f"assumption.weather_heat|temp={config.peak_temperature_c:.0f}")
 
     return PlanResult(
         splits=splits,

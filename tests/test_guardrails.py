@@ -38,10 +38,7 @@ def test_effort_policy_changes_grf92_finish_time() -> None:
     )
 
     assert conservative.total_time_min > aggressive.total_time_min
-    assert (
-        "Effort policy nudges pacing more conservatively or aggressively."
-        in conservative.assumptions
-    )
+    assert "assumption.effort_policy" in conservative.assumptions
 
 
 def test_hr_guardrail_changes_grf92_finish_time() -> None:
@@ -89,13 +86,8 @@ def test_hr_guardrail_changes_grf92_finish_time() -> None:
     )
 
     assert lower_cap.total_time_min > higher_cap.total_time_min
-    assert (
-        "Derived HR guardrail tempers pacing on steeper or later-course segments."
-        in lower_cap.assumptions
-    )
-    assert any(
-        "Derived HR strategy targets roughly" in assumption for assumption in lower_cap.assumptions
-    )
+    assert "assumption.hr_guardrail" in lower_cap.assumptions
+    assert any("assumption.hr_strategy" in assumption for assumption in lower_cap.assumptions)
 
 
 def test_hr_guardrail_uses_profile_pace_relationships() -> None:

@@ -45,7 +45,7 @@ def test_fade_profile_presets_change_trail_finish_time() -> None:
     )
 
     assert blow_up.total_time_min > stable.total_time_min
-    assert "Fade profile progressively slows pace across the event." in blow_up.assumptions
+    assert "assumption.fade_profile" in blow_up.assumptions
 
 
 def test_trail_durability_factor_reduces_fade_cost() -> None:

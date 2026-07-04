@@ -153,7 +153,7 @@ def test_fueling_plan_warns_on_large_carb_deficit() -> None:
     fueling = build_fueling_plan(plan_result, 70.0, 20.0, [])
 
     assert len(fueling.warnings) > 0
-    assert any("gut stress" in w.lower() for w in fueling.warnings)
+    assert any("warning.gut_stress" in w for w in fueling.warnings)
 
 
 def test_carry_items_use_realistic_gel_sizes() -> None:

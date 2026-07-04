@@ -122,7 +122,7 @@ def hr_guardrail_strategy_summary(config: PacingConfig) -> str | None:
     early_cap = int(round(base_cap + early_offset))
     mid_cap = int(round(base_cap + mid_offset))
     late_cap = int(round(base_cap + late_offset))
-    return f"Derived HR strategy targets roughly {early_cap}/{mid_cap}/{late_cap} bpm across early, mid, and late race phases."
+    return f"assumption.hr_strategy|early_cap={early_cap},mid_cap={mid_cap},late_cap={late_cap}"
 
 
 def effort_guardrail_multiplier(

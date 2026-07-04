@@ -312,6 +312,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "assumption.effort_policy": "Effort policy nudges pacing more conservatively or aggressively.",
         "assumption.hr_guardrail": "Derived HR guardrail tempers pacing on steeper or later-course segments.",
         "assumption.weather_heat": "Weather model applies heat penalty using peak {temp:.0f}°C with diurnal temperature variation across the event.",
+        "assumption.hr_strategy": "Derived HR strategy targets roughly {early_cap}/{mid_cap}/{late_cap} bpm across early, mid, and late race phases.",
         # ── Fueling warnings (emitted as keys) ───────────────────────
         "warning.carb_deficit": "Planned carb intake falls {deficit:.0f}g short of target. Consider increasing fueling frequency.",
         "warning.gut_stress": "Late-race gut stress may reduce absorption by 30-50%. Consider front-loading carb intake.",
@@ -617,6 +618,7 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "assumption.effort_policy": "La politique d'effort ajuste l'allure de manière plus conservative ou agressive.",
         "assumption.hr_guardrail": "Le garde-fou FC dérivé tempère l'allure sur les segments raides ou de fin de course.",
         "assumption.weather_heat": "Le modèle météo applique une pénalité de chaleur avec un maximum de {temp:.0f}°C et une variation diurne.",
+        "assumption.hr_strategy": "La stratégie FC dérivée cible environ {early_cap}/{mid_cap}/{late_cap} bpm sur les phases début, milieu et fin de course.",
         # ── Fueling warnings ────────────────────────────────────────
         "warning.carb_deficit": "Apport glucidique prévu inférieur de {deficit:.0f}g à la cible. Envisagez d'augmenter la fréquence nutritionnelle.",
         "warning.gut_stress": "Le stress intestinal en fin de course peut réduire l'absorption de 30-50%. Envisagez d'avancer la prise de glucides.",

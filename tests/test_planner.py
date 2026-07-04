@@ -127,4 +127,4 @@ def test_pacing_bias_progressively_changes_total_time() -> None:
     )
 
     assert conservative.total_time_min > aggressive.total_time_min
-    assert "Pacing bias progressively shifts pace across the course." in conservative.assumptions
+    assert "assumption.pacing_bias" in conservative.assumptions

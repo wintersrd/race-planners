@@ -39,7 +39,7 @@ def test_heat_penalty_materially_slows_grf92_finish_time() -> None:
 
     assert hot.total_time_min > cool.total_time_min
     assert hot.total_time_min - cool.total_time_min > 30.0
-    assert any("Weather model applies heat penalty" in a for a in hot.assumptions)
+    assert any("assumption.weather_heat" in a for a in hot.assumptions)
 
 
 def test_heat_curve_handles_multi_day_ultra_without_crash() -> None:
@@ -63,7 +63,7 @@ def test_heat_curve_handles_multi_day_ultra_without_crash() -> None:
 
     assert result.total_time_min > 0
     assert result.moving_time_min > 0
-    assert any("Weather model applies heat penalty" in a for a in result.assumptions)
+    assert any("assumption.weather_heat" in a for a in result.assumptions)
 
 
 def test_trail_heat_and_hill_tolerance_reduce_penalties() -> None:
