@@ -557,11 +557,34 @@ def test_road_intent_target_time_and_labels_shift_with_intent() -> None:
 
 def test_trail_durability_factor_reduces_fade_cost() -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "grf92")
-    loaded = load_course_trackpoints(course)
+    short_course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    short_loaded = load_course_trackpoints(short_course)
+    long_course = get_course_by_id(repo_root, "grf92")
+    long_loaded = load_course_trackpoints(long_course)
+    very_long_course = get_course_by_id(repo_root, "grf166")
+    very_long_loaded = load_course_trackpoints(very_long_course)
 
-    durable = calculate_plan(
-        loaded,
+    short_durable = calculate_plan(
+        short_loaded,
+        PacingConfig(
+            race_model="half_marathon",
+            input_mode="effort_anchor",
+            marathon_pace_min_km=5.0,
+            athlete_durability_factor=1.0,
+        ),
+    )
+    short_fragile = calculate_plan(
+        short_loaded,
+        PacingConfig(
+            race_model="half_marathon",
+            input_mode="effort_anchor",
+            marathon_pace_min_km=5.0,
+            athlete_durability_factor=-1.0,
+        ),
+    )
+
+    long_durable = calculate_plan(
+        long_loaded,
         PacingConfig(
             race_model="technical_trail_ultra",
             input_mode="effort_anchor",
@@ -573,8 +596,8 @@ def test_trail_durability_factor_reduces_fade_cost() -> None:
             athlete_durability_factor=1.0,
         ),
     )
-    fragile = calculate_plan(
-        loaded,
+    long_fragile = calculate_plan(
+        long_loaded,
         PacingConfig(
             race_model="technical_trail_ultra",
             input_mode="effort_anchor",
@@ -587,7 +610,40 @@ def test_trail_durability_factor_reduces_fade_cost() -> None:
         ),
     )
 
-    assert durable.total_time_min < fragile.total_time_min
+    very_long_durable = calculate_plan(
+        very_long_loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=9.0,
+            hike_pace_min_km=14.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            fade_profile_preset="progressive_fade",
+            athlete_durability_factor=1.0,
+        ),
+    )
+    very_long_fragile = calculate_plan(
+        very_long_loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=9.0,
+            hike_pace_min_km=14.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            fade_profile_preset="progressive_fade",
+            athlete_durability_factor=-1.0,
+        ),
+    )
+
+    short_delta = short_fragile.total_time_min - short_durable.total_time_min
+    long_delta = long_fragile.total_time_min - long_durable.total_time_min
+    very_long_delta = very_long_fragile.total_time_min - very_long_durable.total_time_min
+
+    assert short_delta > 0
+    assert long_delta > short_delta * 3
+    assert very_long_delta > long_delta * 1.25
 
 
 def test_trail_heat_and_hill_tolerance_reduce_penalties() -> None:
