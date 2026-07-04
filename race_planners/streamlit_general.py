@@ -899,30 +899,33 @@ def render_general_planner(repo_root: Path) -> None:
             )
 
             st.markdown("#### Road Capability")
+            st.caption(
+                "Manual best-likely values outrank predictor values. Predictor values outrank LT-derived modeled estimates."
+            )
             athlete_profile["best_likely_half_time_min"] = _parse_optional_number(
                 st.text_input(
-                    "Best Likely Half Marathon (min)",
+                    "Best Likely Half Marathon (ideal min)",
                     _profile_text(athlete_profile, "best_likely_half_time_min"),
                     help="Manual best-likely half-marathon result in neutral conditions. This will outrank derived estimates later.",
                 )
             )
             athlete_profile["best_likely_marathon_time_min"] = _parse_optional_number(
                 st.text_input(
-                    "Best Likely Marathon (min)",
+                    "Best Likely Marathon (ideal min)",
                     _profile_text(athlete_profile, "best_likely_marathon_time_min"),
                     help="Manual best-likely marathon result in neutral conditions. This will outrank derived estimates later.",
                 )
             )
             athlete_profile["predictor_half_time_min"] = _parse_optional_number(
                 st.text_input(
-                    "Predictor Half Marathon (min)",
+                    "Predictor Half Marathon (ideal min)",
                     _profile_text(athlete_profile, "predictor_half_time_min"),
                     help="Optional external estimate such as COROS, Strava, or Intervals.icu.",
                 )
             )
             athlete_profile["predictor_marathon_time_min"] = _parse_optional_number(
                 st.text_input(
-                    "Predictor Marathon (min)",
+                    "Predictor Marathon (ideal min)",
                     _profile_text(athlete_profile, "predictor_marathon_time_min"),
                     help="Optional external marathon estimate from a trusted predictor source.",
                 )
@@ -951,6 +954,9 @@ def render_general_planner(repo_root: Path) -> None:
             )
 
             st.markdown("#### Universal Factors")
+            st.caption(
+                "These factors influence both road and trail events. Positive values help you resist that cost; negative values amplify it."
+            )
             athlete_profile["durability_factor"] = st.slider(
                 "Durability Factor",
                 min_value=-1.0,
@@ -1199,6 +1205,13 @@ def render_general_planner(repo_root: Path) -> None:
                     use_container_width=True,
                     hide_index=True,
                 )
+                with st.expander("How road planning works"):
+                    st.markdown(
+                        "- **Selected Best Likely** is the capability source that currently wins by precedence: manual profile, then predictor, then LT-derived model.\n"
+                        "- **Adjusted Best Likely** applies course and weather costs to that capability for the selected event.\n"
+                        "- **Race Intent** shifts the suggested target away from the adjusted best-likely result without changing the underlying capability estimate.\n"
+                        "- **Chosen Target** is whatever target you currently entered. The planner compares it to adjusted best likely to estimate feasibility, effort, and recovery cost."
+                    )
 
     new_config = PacingConfig(
         race_model=race_model,

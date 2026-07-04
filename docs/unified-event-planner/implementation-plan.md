@@ -193,6 +193,15 @@ Status: In progress
     generation
   - added regression coverage proving those universal factors materially change
     trail event finish times instead of remaining saved-profile metadata only
+- Road/athlete Phase 7 completed:
+  - clarified the athlete-profile and road-capability UI with more explicit
+    wording around precedence, ideal-condition best-likely values, and universal
+    factors that apply across road and trail events
+  - added plain-language explanation of how selected best likely, adjusted best
+    likely, race intent, and chosen target relate to each other in road-event
+    planning
+  - browser-validated the road event flow to confirm the explanation appears in
+    the live unified planner next to the capability and intent controls
 
 ## Objective
 
