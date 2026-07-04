@@ -371,6 +371,7 @@ def _simulate_total_time(
         pace_min_km = model.pace_for_context(context)
         pace_min_km *= _pacing_shape_multiplier(config, context.progress_ratio)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
+        pace_min_km *= _trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
         cumulative_time += pace_min_km * _fatigue_multiplier(race_model, context.progress_ratio)
 
@@ -382,6 +383,7 @@ def _simulate_total_time(
         pace_min_km = model.pace_for_context(context)
         pace_min_km *= _pacing_shape_multiplier(config, 1.0)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
+        pace_min_km *= _trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
         cumulative_time += pace_min_km * remaining * _fatigue_multiplier(race_model, 1.0)
 
@@ -414,6 +416,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         pace_min_km = model.pace_for_context(context)
         pace_min_km *= _pacing_shape_multiplier(config, progress_ratio)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
+        pace_min_km *= _trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
         pace_min_km *= _fatigue_multiplier(config.race_model, progress_ratio)
         cumulative_time += pace_min_km
@@ -435,6 +438,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         pace_min_km = model.pace_for_context(context)
         pace_min_km *= _pacing_shape_multiplier(config, 1.0)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
+        pace_min_km *= _trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
         pace_min_km *= _fatigue_multiplier(config.race_model, 1.0)
         segment_time = pace_min_km * remaining
@@ -610,7 +614,10 @@ def _segment_heat_multiplier(config: PacingConfig, cumulative_time_min: float) -
         cumulative_time_min / 60.0,
         config.event_start_time_local,
     )
-    return _heat_multiplier(temp)
+    raw_heat_multiplier = _heat_multiplier(temp)
+    return 1.0 + (
+        (raw_heat_multiplier - 1.0) * _tolerance_penalty_scale(config.athlete_heat_tolerance)
+    )
 
 
 def _tolerance_penalty_scale(tolerance: float | None) -> float:
@@ -766,7 +773,15 @@ def _fade_profile_values(config: PacingConfig) -> tuple[float, float, float]:
         "progressive_fade": (0.5, 2.0, 4.5),
         "blow_up_risk": (1.5, 4.0, 7.0),
     }
-    return preset_map.get(config.fade_profile_preset or "stable", preset_map["stable"])
+    early_bias, mid_bias, late_bias = preset_map.get(
+        config.fade_profile_preset or "stable", preset_map["stable"]
+    )
+    durability_scale = _tolerance_penalty_scale(config.athlete_durability_factor)
+    return (
+        early_bias * durability_scale,
+        mid_bias * durability_scale,
+        late_bias * durability_scale,
+    )
 
 
 def _interpolated_fade_bias(config: PacingConfig, progress_ratio: float) -> float:
@@ -798,6 +813,20 @@ def _effort_policy_rpe_target(config: PacingConfig) -> float | None:
         "aggressive": 7.5,
     }
     return policy_map.get(config.effort_policy or "", None)
+
+
+def _trail_hill_tolerance_multiplier(config: PacingConfig, context: PacingContext) -> float:
+    if _is_road_race_model(config.race_model):
+        return 1.0
+
+    terrain_load = max(
+        max(context.steepest_climb_percent, 0.0) / 20.0,
+        abs(min(context.steepest_descent_percent, 0.0)) / 20.0,
+        context.climb_m_per_km / 35.0,
+    )
+    terrain_load = min(max(terrain_load, 0.0), 1.5)
+    tolerance = float(config.athlete_hill_tolerance or 0.0)
+    return min(max(1.0 - (tolerance * 0.12 * terrain_load), 0.85), 1.15)
 
 
 def _hr_guardrail_phase_offsets(config: PacingConfig) -> tuple[float, float, float]:

@@ -184,6 +184,15 @@ Status: In progress
     only raw target times
   - added regression coverage proving intent shifts suggested targets and the
     derived feasibility / effort / recovery labels in the expected direction
+- Road/athlete Phase 6 completed:
+  - made the universal athlete factors actually affect trail and ultra
+    calculations by threading durability, heat tolerance, and hill tolerance
+    through the canonical planner config
+  - durability now scales fade severity, heat tolerance now scales weather
+    penalty, and hill tolerance now scales trail terrain cost during actual plan
+    generation
+  - added regression coverage proving those universal factors materially change
+    trail event finish times instead of remaining saved-profile metadata only
 
 ## Objective
 

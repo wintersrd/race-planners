@@ -1228,6 +1228,9 @@ def render_general_planner(repo_root: Path) -> None:
         athlete_technical_trail_slowdown_sec_km=athlete_profile.get(
             "technical_trail_slowdown_sec_km"
         ),
+        athlete_durability_factor=athlete_profile.get("durability_factor"),
+        athlete_heat_tolerance=athlete_profile.get("heat_tolerance"),
+        athlete_hill_tolerance=athlete_profile.get("hill_tolerance"),
         rpe_target=(
             None if _is_road_event(selected_event) else EFFORT_POLICY_PRESETS[effort_policy][1]
         ),

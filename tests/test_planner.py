@@ -544,3 +544,77 @@ def test_road_intent_target_time_and_labels_shift_with_intent() -> None:
     assert classify_road_effort_band(adjusted_best_likely_time_min, best_effort) == "Near Limit"
     assert classify_road_recovery_cost(adjusted_best_likely_time_min, easy) == "Low"
     assert classify_road_recovery_cost(adjusted_best_likely_time_min, best_effort) == "High"
+
+
+def test_trail_durability_factor_reduces_fade_cost() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    course = get_course_by_id(repo_root, "grf92")
+    loaded = load_course_trackpoints(course)
+
+    durable = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=8.5,
+            hike_pace_min_km=13.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            fade_profile_preset="progressive_fade",
+            athlete_durability_factor=1.0,
+        ),
+    )
+    fragile = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=8.5,
+            hike_pace_min_km=13.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            fade_profile_preset="progressive_fade",
+            athlete_durability_factor=-1.0,
+        ),
+    )
+
+    assert durable.total_time_min < fragile.total_time_min
+
+
+def test_trail_heat_and_hill_tolerance_reduce_penalties() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    course = get_course_by_id(repo_root, "grf92")
+    loaded = load_course_trackpoints(course)
+
+    tolerant = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=8.5,
+            hike_pace_min_km=13.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            peak_temperature_c=28.0,
+            event_start_time_local="06:30",
+            athlete_heat_tolerance=1.0,
+            athlete_hill_tolerance=1.0,
+        ),
+    )
+    intolerant = calculate_plan(
+        loaded,
+        PacingConfig(
+            race_model="technical_trail_ultra",
+            input_mode="effort_anchor",
+            flat_pace_min_km=8.5,
+            hike_pace_min_km=13.0,
+            climb_hike_threshold_percent=12.0,
+            descent_caution="medium",
+            peak_temperature_c=28.0,
+            event_start_time_local="06:30",
+            athlete_heat_tolerance=-1.0,
+            athlete_hill_tolerance=-1.0,
+        ),
+    )
+
+    assert tolerant.total_time_min < intolerant.total_time_min

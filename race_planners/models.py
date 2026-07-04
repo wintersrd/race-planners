@@ -120,6 +120,9 @@ class PacingConfig:
     athlete_lt2_pace_min_km: float | None = None
     athlete_flat_trail_slowdown_sec_km: float | None = None
     athlete_technical_trail_slowdown_sec_km: float | None = None
+    athlete_durability_factor: float | None = None
+    athlete_heat_tolerance: float | None = None
+    athlete_hill_tolerance: float | None = None
     rpe_target: float | None = None
     hr_cap: int | None = None
     peak_temperature_c: float | None = None
