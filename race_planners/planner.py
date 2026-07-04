@@ -613,6 +613,69 @@ def _segment_heat_multiplier(config: PacingConfig, cumulative_time_min: float) -
     return _heat_multiplier(temp)
 
 
+def _tolerance_penalty_scale(tolerance: float | None) -> float:
+    if tolerance is None:
+        return 1.0
+    return min(max(1.0 - (float(tolerance) * 0.25), 0.6), 1.4)
+
+
+def _average_heat_multiplier_for_duration(
+    peak_temperature_c: float | None,
+    start_time_local: str | None,
+    duration_min: float,
+) -> float:
+    if peak_temperature_c is None or duration_min <= 0:
+        return 1.0
+
+    sample_count = max(3, min(24, int(math.ceil(duration_min / 30.0))))
+    total_multiplier = 0.0
+    for index in range(sample_count):
+        elapsed_hours = (duration_min * ((index + 0.5) / sample_count)) / 60.0
+        total_multiplier += _heat_multiplier(
+            _temperature_at_elapsed(peak_temperature_c, elapsed_hours, start_time_local)
+        )
+    return total_multiplier / sample_count
+
+
+def estimate_road_adjusted_best_likely(
+    loaded_course: LoadedCourse,
+    base_time_min: float,
+    peak_temperature_c: float | None,
+    start_time_local: str | None,
+    hill_tolerance: float | None,
+    heat_tolerance: float | None,
+) -> dict[str, float]:
+    course_gap_multiplier = _estimate_course_gap_multiplier(
+        loaded_course.trackpoints,
+        loaded_course.total_distance_km,
+    )
+    course_multiplier = 1.0 + (
+        (course_gap_multiplier - 1.0) * _tolerance_penalty_scale(hill_tolerance)
+    )
+
+    adjusted_time_min = base_time_min * course_multiplier
+    average_heat_multiplier = 1.0
+    weather_multiplier = 1.0
+    for _ in range(4):
+        average_heat_multiplier = _average_heat_multiplier_for_duration(
+            peak_temperature_c,
+            start_time_local,
+            adjusted_time_min,
+        )
+        weather_multiplier = 1.0 + (
+            (average_heat_multiplier - 1.0) * _tolerance_penalty_scale(heat_tolerance)
+        )
+        adjusted_time_min = base_time_min * course_multiplier * weather_multiplier
+
+    return {
+        "base_time_min": round(base_time_min, 2),
+        "course_multiplier": round(course_multiplier, 4),
+        "weather_multiplier": round(weather_multiplier, 4),
+        "average_heat_multiplier": round(average_heat_multiplier, 4),
+        "adjusted_time_min": round(adjusted_time_min, 2),
+    }
+
+
 def _is_road_race_model(race_model: str) -> bool:
     return race_model in {"road_marathon", "half_marathon"}
 

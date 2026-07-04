@@ -370,6 +370,18 @@ def test_default_config_for_road_event_uses_modeled_capability_when_no_override(
     assert config["target_finish_time_min"] < 105.5
 
 
+def test_course_overview_rows_include_known_start_time(tmp_path: Path) -> None:
+    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
+    (tmp_path / "semi-marathon-finistere" / "marathon-des-etoiles-de-la-baie.gpx").write_text(
+        "<gpx></gpx>", encoding="utf-8"
+    )
+    event = get_curated_event(tmp_path, "marathon-etoiles-baie")
+
+    rows = _course_overview_rows(42.06, event)
+
+    assert any(row == {"label": "Start Time", "value": "9:00 AM"} for row in rows)
+
+
 def test_derived_hr_guardrail_cap_uses_profile_and_policy() -> None:
     guardrail = _derived_hr_guardrail_cap(
         {"lt1_hr": 152, "lt2_hr": 170},

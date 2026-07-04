@@ -27,6 +27,7 @@ from race_planners.planner import (
     calculate_plan,
     estimate_road_best_likely_pace_min_km,
     estimate_road_best_likely_time_min,
+    estimate_road_adjusted_best_likely,
     load_course_trackpoints,
     road_race_distance_km as planner_road_race_distance_km,
 )
@@ -1081,6 +1082,45 @@ def render_general_planner(repo_root: Path) -> None:
         if selected_capability_time_min is not None and selected_capability_source is not None:
             st.caption(
                 f"Selected capability source: {selected_capability_source} ({_format_duration_minutes(selected_capability_time_min)})"
+            )
+            adjusted_capability = estimate_road_adjusted_best_likely(
+                overview_course,
+                selected_capability_time_min,
+                peak_temperature_c=float(
+                    cfg.get("peak_temperature_c", selected_event.baseline_peak_temp_c or 18.0)
+                ),
+                start_time_local=selected_event.start_time_local,
+                hill_tolerance=athlete_profile.get("hill_tolerance"),
+                heat_tolerance=athlete_profile.get("heat_tolerance"),
+            )
+            st.dataframe(
+                pd.DataFrame(
+                    [
+                        {
+                            "Metric": "Selected Best Likely",
+                            "Value": _format_duration_minutes(adjusted_capability["base_time_min"]),
+                        },
+                        {
+                            "Metric": "Course Impact",
+                            "Value": f"x{adjusted_capability['course_multiplier']:.3f}",
+                        },
+                        {
+                            "Metric": "Weather Impact",
+                            "Value": f"x{adjusted_capability['weather_multiplier']:.3f}",
+                        },
+                        {
+                            "Metric": "Adjusted Best Likely",
+                            "Value": _format_duration_minutes(
+                                adjusted_capability["adjusted_time_min"]
+                            ),
+                        },
+                    ]
+                ),
+                use_container_width=True,
+                hide_index=True,
+            )
+            st.caption(
+                "Adjusted best likely applies course and weather costs, scaled by hill and heat tolerance from the athlete profile."
             )
 
     new_config = PacingConfig(

@@ -163,6 +163,16 @@ Status: In progress
   - added regression coverage proving the solver stays within the LT1/LT2 pace
     envelope, treats marathon pacing more conservatively than half-marathon
     pacing, and places faster half-marathon athletes nearer LT2 than slower ones
+- Road/athlete Phase 4 completed:
+  - added a road event-adjustment layer that turns selected best-likely road
+    capability into event-adjusted best likely using course cost, weather cost,
+    hill tolerance, and heat tolerance
+  - exposed the adjusted road capability breakdown in the unified planner so the
+    user can see selected best likely, course impact, weather impact, and the
+    combined adjusted best-likely result before choosing intent
+  - added regression coverage proving hotter and hillier road events slow the
+    adjusted best-likely outcome and that tolerance factors materially reduce or
+    amplify that penalty
 
 ## Objective
 

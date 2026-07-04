@@ -8,6 +8,7 @@ from race_planners.planner import (
     calculate_plan,
     estimate_road_best_likely_pace_min_km,
     estimate_road_best_likely_time_min,
+    estimate_road_adjusted_best_likely,
     load_course_trackpoints,
 )
 
@@ -479,3 +480,47 @@ def test_road_best_likely_solver_returns_more_conservative_marathon_than_half() 
     marathon_pace = estimate_road_best_likely_pace_min_km("road_marathon", 5.0, 4.25)
 
     assert marathon_pace > half_pace
+
+
+def test_road_adjusted_best_likely_slows_with_heat_and_hills() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    course = get_course_by_id(repo_root, "marathon-etoiles-baie")
+    loaded = load_course_trackpoints(course)
+
+    adjusted = estimate_road_adjusted_best_likely(
+        loaded,
+        base_time_min=198.0,
+        peak_temperature_c=20.0,
+        start_time_local="09:00",
+        hill_tolerance=0.0,
+        heat_tolerance=0.0,
+    )
+
+    assert adjusted["adjusted_time_min"] > 198.0
+    assert adjusted["course_multiplier"] >= 1.0
+    assert adjusted["weather_multiplier"] >= 1.0
+
+
+def test_road_adjusted_best_likely_respects_tolerance_modifiers() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    course = get_course_by_id(repo_root, "marathon-etoiles-baie")
+    loaded = load_course_trackpoints(course)
+
+    tolerant = estimate_road_adjusted_best_likely(
+        loaded,
+        base_time_min=198.0,
+        peak_temperature_c=20.0,
+        start_time_local="09:00",
+        hill_tolerance=1.0,
+        heat_tolerance=1.0,
+    )
+    intolerant = estimate_road_adjusted_best_likely(
+        loaded,
+        base_time_min=198.0,
+        peak_temperature_c=20.0,
+        start_time_local="09:00",
+        hill_tolerance=-1.0,
+        heat_tolerance=-1.0,
+    )
+
+    assert tolerant["adjusted_time_min"] < intolerant["adjusted_time_min"]
