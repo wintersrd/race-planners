@@ -1,4 +1,5 @@
-from race_planners.planner import _build_segment_summaries, _fatigue_multiplier
+from race_planners.planner import _fatigue_multiplier
+from race_planners.segments import build_segment_summaries
 from race_planners.models import AidStation, PaceSplit
 
 
@@ -18,7 +19,7 @@ def test_segment_summary_groups_adjacent_split_types() -> None:
         PaceSplit(4.0, 5.2, -3.3, 5.2, 22.9),
     ]
 
-    segments = _build_segment_summaries(splits)
+    segments = build_segment_summaries(splits)
 
     assert [s.segment_type for s in segments] == ["climb", "flat", "descent"]
     assert segments[0].distance_km == 2.0
@@ -33,7 +34,7 @@ def test_segment_summary_respects_aid_station_boundaries() -> None:
         PaceSplit(3.0, 5.0, -3.0, 5.0, 17.0),
     ]
 
-    segments = _build_segment_summaries(
+    segments = build_segment_summaries(
         splits,
         aid_stations=[AidStation(distance_km=1.5, label="Aid 1")],
         total_distance_km=3.0,
