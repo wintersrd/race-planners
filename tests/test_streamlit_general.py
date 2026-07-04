@@ -1,21 +1,17 @@
 from pathlib import Path
 
 from race_planners.event_catalog import get_curated_event
+from race_planners.formatting import format_clock_time, format_duration_minutes, format_pace_minutes
 from race_planners.models import AthleteProfile, PacingConfig, PaceSplit, TrackPoint
-from race_planners.plan_io import export_plan_json
-from race_planners.streamlit_general import (
-    _aggregate_split_rows,
-    _course_overview_rows,
-    _default_config_for_event,
-    _derived_hr_guardrail_cap,
-    _format_clock_time,
-    _format_duration_minutes,
-    _format_pace_minutes,
-    _modeled_road_best_likely_time_min,
-    _road_capability_sources,
-    _selected_road_capability,
-    load_plan_into_state,
+from race_planners.plan_io import export_plan_json, load_plan_into_state
+from race_planners.profile import (
+    default_config_for_event,
+    derived_hr_guardrail_cap,
+    modeled_road_best_likely_time_min,
+    road_capability_sources,
+    selected_road_capability,
 )
+from race_planners.splits import aggregate_split_rows, course_overview_rows
 
 
 def test_load_plan_into_state_returns_user_facing_missing_gpx_error(tmp_path: Path) -> None:
@@ -163,14 +159,14 @@ def test_athlete_profile_dataclass_round_trips_new_fields() -> None:
     assert profile.hill_tolerance == 0.2
 
 
-def test_course_overview_rows_reflect_event_metadata(tmp_path: Path) -> None:
+def testcourse_overview_rows_reflect_event_metadata(tmp_path: Path) -> None:
     (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
     (tmp_path / "semi-marathon-finistere" / "semi-marathon-du-finistere.gpx").write_text(
         "<gpx></gpx>", encoding="utf-8"
     )
     event = get_curated_event(tmp_path, "semi-marathon-finistere")
 
-    rows = _course_overview_rows(21.06, event)
+    rows = course_overview_rows(21.06, event)
 
     assert rows[0] == {"label": "Distance", "value": "21.06 km"}
     assert any(row == {"label": "Terrain", "value": "Road"} for row in rows)
@@ -186,19 +182,19 @@ def test_time_format_helpers_render_human_readable_values(tmp_path: Path) -> Non
     )
     event = get_curated_event(tmp_path, "grf92")
 
-    assert _format_pace_minutes(4.5) == "4:30"
-    assert _format_duration_minutes(88.5) == "1:28:30"
-    assert _format_duration_minutes(4.5) == "4:30"
-    assert _format_clock_time(event, 88.5) == "7:58 AM"
+    assert format_pace_minutes(4.5) == "4:30"
+    assert format_duration_minutes(88.5) == "1:28:30"
+    assert format_duration_minutes(4.5) == "4:30"
+    assert format_clock_time(event, 88.5) == "7:58 AM"
 
 
-def test_aggregate_split_rows_supports_multi_kilometer_blocks(tmp_path: Path) -> None:
+def testaggregate_split_rows_supports_multi_kilometer_blocks(tmp_path: Path) -> None:
     (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
     (tmp_path / "semi-marathon-finistere" / "2026-grf92.gpx").write_text(
         "<gpx></gpx>", encoding="utf-8"
     )
     event = get_curated_event(tmp_path, "grf92")
-    rows = _aggregate_split_rows(
+    rows = aggregate_split_rows(
         splits=[
             PaceSplit(1.0, 5.0, 2.0, 5.0, 5.0),
             PaceSplit(2.0, 7.0, 4.0, 7.0, 12.0),
@@ -228,7 +224,7 @@ def test_default_config_for_trail_event_uses_athlete_profile_defaults(tmp_path: 
     )
     event = get_curated_event(tmp_path, "grf92")
 
-    config = _default_config_for_event(
+    config = default_config_for_event(
         event,
         {
             "lt1_pace_min_km": 5.0,
@@ -254,7 +250,7 @@ def test_default_config_for_road_event_uses_profile_split_bias(tmp_path: Path) -
     )
     event = get_curated_event(tmp_path, "semi-marathon-finistere")
 
-    config = _default_config_for_event(
+    config = default_config_for_event(
         event,
         {
             "lt1_pace_min_km": 5.0,
@@ -268,7 +264,7 @@ def test_default_config_for_road_event_uses_profile_split_bias(tmp_path: Path) -
     assert config["pacing_bias"] == -2.5
 
 
-def test_selected_road_capability_prefers_manual_then_predictor_then_model() -> None:
+def testselected_road_capability_prefers_manual_then_predictor_then_model() -> None:
     profile = {
         "best_likely_marathon_time_min": 205.0,
         "predictor_marathon_time_min": 210.0,
@@ -276,19 +272,19 @@ def test_selected_road_capability_prefers_manual_then_predictor_then_model() -> 
         "lt1_pace_min_km": 5.0,
     }
 
-    selected_time_min, selected_source = _selected_road_capability(profile, "road_marathon")
+    selected_time_min, selected_source = selected_road_capability(profile, "road_marathon")
 
     assert selected_time_min == 205.0
     assert selected_source == "Manual Profile"
 
     del profile["best_likely_marathon_time_min"]
-    selected_time_min, selected_source = _selected_road_capability(profile, "road_marathon")
+    selected_time_min, selected_source = selected_road_capability(profile, "road_marathon")
 
     assert selected_time_min == 210.0
     assert selected_source == "COROS"
 
     del profile["predictor_marathon_time_min"]
-    selected_time_min, selected_source = _selected_road_capability(profile, "road_marathon")
+    selected_time_min, selected_source = selected_road_capability(profile, "road_marathon")
 
     assert selected_time_min is not None
     assert selected_source == "LT-Derived Model"
@@ -300,8 +296,8 @@ def test_modeled_road_best_likely_time_uses_current_profile_heuristic() -> None:
         "lt2_pace_min_km": 4.25,
     }
 
-    half_time_min = _modeled_road_best_likely_time_min(profile, "half_marathon")
-    marathon_time_min = _modeled_road_best_likely_time_min(profile, "road_marathon")
+    half_time_min = modeled_road_best_likely_time_min(profile, "half_marathon")
+    marathon_time_min = modeled_road_best_likely_time_min(profile, "road_marathon")
 
     assert half_time_min is not None
     assert marathon_time_min is not None
@@ -310,8 +306,8 @@ def test_modeled_road_best_likely_time_uses_current_profile_heuristic() -> None:
     assert marathon_time_min > half_time_min
 
 
-def test_road_capability_sources_marks_selected_source() -> None:
-    sources = _road_capability_sources(
+def testroad_capability_sources_marks_selected_source() -> None:
+    sources = road_capability_sources(
         {
             "predictor_half_time_min": 92.0,
             "predictor_source": "Strava",
@@ -337,7 +333,7 @@ def test_default_config_for_road_event_uses_selected_capability_time(tmp_path: P
     )
     event = get_curated_event(tmp_path, "marathon-etoiles-baie")
 
-    config = _default_config_for_event(
+    config = default_config_for_event(
         event,
         {
             "best_likely_marathon_time_min": 198.0,
@@ -358,7 +354,7 @@ def test_default_config_for_road_event_uses_modeled_capability_when_no_override(
     )
     event = get_curated_event(tmp_path, "semi-marathon-finistere")
 
-    config = _default_config_for_event(
+    config = default_config_for_event(
         event,
         {
             "lt1_pace_min_km": 5.0,
@@ -371,20 +367,20 @@ def test_default_config_for_road_event_uses_modeled_capability_when_no_override(
     assert config["target_finish_time_min"] < 105.5
 
 
-def test_course_overview_rows_include_known_start_time(tmp_path: Path) -> None:
+def testcourse_overview_rows_include_known_start_time(tmp_path: Path) -> None:
     (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
     (tmp_path / "semi-marathon-finistere" / "marathon-des-etoiles-de-la-baie.gpx").write_text(
         "<gpx></gpx>", encoding="utf-8"
     )
     event = get_curated_event(tmp_path, "marathon-etoiles-baie")
 
-    rows = _course_overview_rows(42.06, event)
+    rows = course_overview_rows(42.06, event)
 
     assert any(row == {"label": "Start Time", "value": "9:00 AM"} for row in rows)
 
 
-def test_derived_hr_guardrail_cap_uses_profile_and_policy() -> None:
-    guardrail = _derived_hr_guardrail_cap(
+def testderived_hr_guardrail_cap_uses_profile_and_policy() -> None:
+    guardrail = derived_hr_guardrail_cap(
         {"lt1_hr": 152, "lt2_hr": 170},
         "technical_trail_ultra",
         "conservative",
@@ -393,12 +389,12 @@ def test_derived_hr_guardrail_cap_uses_profile_and_policy() -> None:
     assert guardrail == 153
 
 
-def test_derived_hr_guardrail_cap_varies_by_event_type() -> None:
+def testderived_hr_guardrail_cap_varies_by_event_type() -> None:
     profile = {"lt1_hr": 152, "lt2_hr": 170}
 
-    technical = _derived_hr_guardrail_cap(profile, "technical_trail_ultra", "steady")
-    fire_road = _derived_hr_guardrail_cap(profile, "fire_road_ultra", "steady")
-    road = _derived_hr_guardrail_cap(profile, "road_marathon", "steady")
+    technical = derived_hr_guardrail_cap(profile, "technical_trail_ultra", "steady")
+    fire_road = derived_hr_guardrail_cap(profile, "fire_road_ultra", "steady")
+    road = derived_hr_guardrail_cap(profile, "road_marathon", "steady")
 
     assert technical is not None
     assert fire_road is not None

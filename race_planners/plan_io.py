@@ -5,6 +5,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, cast
 
+from race_planners.event_catalog import get_curated_event_by_course_id
 from race_planners.models import PacingConfig
 
 PLAN_SCHEMA_VERSION = 1
@@ -46,3 +47,28 @@ def ensure_gpx_exists_for_plan(plan_payload: dict[str, Any], gpx_search_roots: l
     raise FileNotFoundError(
         f"Missing course file: {gpx_filename}. Restore this course file in the repository to reload the saved plan."
     )
+
+
+def load_plan_into_state(
+    plan_json: str,
+    repo_root: Path,
+    current_state: dict[str, Any],
+) -> tuple[dict[str, Any], str | None]:
+    try:
+        payload = import_plan_json(plan_json)
+        ensure_gpx_exists_for_plan(
+            payload,
+            [repo_root / "semi-marathon-finistere", repo_root / "courses", repo_root],
+        )
+    except (ValueError, FileNotFoundError) as exc:
+        return current_state, str(exc)
+
+    updated_state = dict(current_state)
+    updated_state["general_course_id"] = str(payload["course_id"])
+    updated_state["general_config"] = dict(payload["config"])
+    if "athlete_profile" in payload:
+        updated_state["general_athlete_profile"] = dict(payload["athlete_profile"])
+    matched_event = get_curated_event_by_course_id(repo_root, str(payload["course_id"]))
+    if matched_event is not None:
+        updated_state["general_event_id"] = matched_event.event_id
+    return updated_state, None
