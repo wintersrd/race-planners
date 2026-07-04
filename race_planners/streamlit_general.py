@@ -16,6 +16,7 @@ from race_planners.event_catalog import (
     get_curated_event_by_course_id,
     list_curated_events,
 )
+from race_planners.fueling import build_fueling_plan
 from race_planners.grade import elevation_changes
 from race_planners.models import AthleteProfile, CuratedEvent, PaceSplit, PacingConfig, TrackPoint
 from race_planners.plan_io import (
@@ -1307,8 +1308,8 @@ def render_general_planner(repo_root: Path) -> None:
             for warning in result.warnings:
                 st.warning(warning)
 
-        tab_summary, tab_profile, tab_aid, tab_sections, tab_splits = st.tabs(
-            ["Summary", "Course Profile", "Aid Stations", "Sections", "Splits"]
+        tab_summary, tab_profile, tab_aid, tab_sections, tab_fueling, tab_splits = st.tabs(
+            ["Summary", "Course Profile", "Aid Stations", "Sections", "Fueling", "Splits"]
         )
 
         with tab_summary:
@@ -1394,6 +1395,57 @@ def render_general_planner(repo_root: Path) -> None:
                 width="stretch",
                 hide_index=True,
             )
+
+        with tab_fueling:
+            body_mass_kg = athlete_profile.get("body_mass_kg")
+            if body_mass_kg is None:
+                st.info("Add your body mass in the Athlete Profile to generate a fueling plan.")
+            else:
+                aid_tiers = [station.tier for station in selected_course.aid_stations]
+                fueling_plan = build_fueling_plan(
+                    result,
+                    mass_kg=float(body_mass_kg),
+                    peak_temperature_c=peak_temperature_c,
+                    aid_station_tiers=aid_tiers,
+                    athlete_sweat_rate=athlete_profile.get("sweat_rate_l_hr"),
+                    gut_carb_tolerance_g_hr=athlete_profile.get("gut_carb_tolerance_g_hr"),
+                )
+                f_sum_a, f_sum_b, f_sum_c, f_sum_d = st.columns(4)
+                f_sum_a.metric("Total kcal", f"{fueling_plan.total_kcal:.0f}")
+                f_sum_b.metric("Avg kcal/hr", f"{fueling_plan.avg_kcal_hr:.0f}")
+                f_sum_c.metric("Carb Target", f"{fueling_plan.total_carb_target_g:.0f}g")
+                f_sum_d.metric("Fluid Target", f"{fueling_plan.total_fluid_target_l:.1f}L")
+                if fueling_plan.warnings:
+                    for warning in fueling_plan.warnings:
+                        st.warning(warning)
+                st.markdown("#### Per-block fueling")
+                st.dataframe(
+                    pd.DataFrame(
+                        [
+                            {
+                                "block": f"{block.start_km:.1f}-{block.end_km:.1f} km",
+                                "tier": block.aid_station_tier,
+                                "duration": _format_duration_minutes(block.duration_min),
+                                "kcal": round(block.kcal_burned),
+                                "carb_target_g": round(block.carb_target_g),
+                                "carb_planned_g": round(block.carb_planned_g),
+                                "on_site_kcal": round(block.on_site_kcal),
+                                "on_site_carb_g": round(block.on_site_carb_g),
+                                "fluid_l": block.fluid_target_l,
+                                "deficit_g": round(block.cumulative_carb_deficit_g),
+                                "carry": "; ".join(block.carry_items) if block.carry_items else "-",
+                            }
+                            for block in fueling_plan.blocks
+                        ]
+                    ),
+                    width="stretch",
+                    hide_index=True,
+                )
+                if fueling_plan.carb_deficit_g > 0:
+                    st.caption(
+                        f"Planned carb intake is {fueling_plan.carb_deficit_g:.0f}g below target. "
+                        "Consider increasing fueling frequency, especially early in the event."
+                    )
 
         with tab_splits:
             split_block_options = _split_block_options(result.total_distance_km)
