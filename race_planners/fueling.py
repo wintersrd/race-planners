@@ -82,6 +82,8 @@ def _aid_station_tier_on_site(tier: str) -> tuple[float, float]:
 
 
 GEL_SIZES_G: tuple[float, ...] = (30.0, 50.0)
+_FUELING_STARTUP_GRACE_MIN = 20.0
+_FUELING_TAIL_CUTOFF_MIN = 20.0
 
 
 def _carry_items_for_block(
@@ -147,6 +149,7 @@ def build_fueling_plan(
     blocks: list[FuelingBlock] = []
     cumulative_carb_planned = 0.0
     cumulative_carb_target = 0.0
+    cumulative_elapsed_min = 0.0
 
     for block_index in range(len(boundaries) - 1):
         start_km = boundaries[block_index]
@@ -168,13 +171,20 @@ def build_fueling_plan(
         block_duration = max(block_duration, 0.0)
         block_duration_hr = block_duration / 60.0
 
+        block_midpoint_elapsed = cumulative_elapsed_min + block_duration / 2.0
+        in_fueling_window = (
+            block_midpoint_elapsed > _FUELING_STARTUP_GRACE_MIN
+            and block_midpoint_elapsed < plan_result.moving_time_min - _FUELING_TAIL_CUTOFF_MIN
+        )
+        cumulative_elapsed_min += block_duration
+
         block_splits = [split for split in plan_result.splits if start_km < split.km <= end_km]
         block_kcal = (
             estimate_event_kcal(mass_kg, block_splits)
             if block_splits
             else mass_kg * distance_km * _BASE_RUNNING_COST_KCAL_PER_KG_KM
         )
-        block_carb_target = effective_carb_target * block_duration_hr
+        block_carb_target = effective_carb_target * block_duration_hr if in_fueling_window else 0.0
         block_fluid_target = sweat_rate * block_duration_hr
 
         tier = "none"
@@ -188,10 +198,14 @@ def build_fueling_plan(
                 tier = "standard"
             on_site_kcal, on_site_carb = _aid_station_tier_on_site(tier)
 
-        carry_items, carry_carb = _carry_items_for_block(
-            max(block_carb_target - on_site_carb, 0.0), gut_carb_tolerance_g_hr
-        )
-        carb_planned = carry_carb + on_site_carb
+        if in_fueling_window:
+            carry_items, carry_carb = _carry_items_for_block(
+                max(block_carb_target - on_site_carb, 0.0), gut_carb_tolerance_g_hr
+            )
+            carb_planned = carry_carb + on_site_carb
+        else:
+            carry_items = []
+            carb_planned = on_site_carb if block_index < len(aid_etas) else 0.0
 
         cumulative_carb_target += block_carb_target
         cumulative_carb_planned += carb_planned
