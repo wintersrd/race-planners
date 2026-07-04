@@ -286,3 +286,17 @@ def elevation_changes(
         prior_elevation = point.elevation
 
     return gain, loss
+
+
+def estimate_course_gap_multiplier(
+    trackpoints: list[TrackPoint], total_distance_km: float
+) -> float:
+    if total_distance_km <= 0:
+        return 1.0
+    grade_sum = 0.0
+    total_segments = max(1, int(total_distance_km))
+    for km in range(1, total_segments + 1):
+        start_m = (km - 1) * 1000
+        end_m = min(km * 1000, total_distance_km * 1000)
+        grade_sum += gap_factor(weighted_average_grade(trackpoints, start_m, end_m))
+    return grade_sum / total_segments

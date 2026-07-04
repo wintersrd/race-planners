@@ -47,6 +47,13 @@ class Course:
             ]
 
 
+@dataclass
+class LoadedCourse:
+    course: Course
+    trackpoints: list[TrackPoint]
+    total_distance_km: float
+
+
 @dataclass(frozen=True)
 class EventTemplate:
     template_id: str

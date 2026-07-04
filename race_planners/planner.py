@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from typing import Callable
 
 from race_planners.fatigue import (
@@ -9,13 +9,12 @@ from race_planners.fatigue import (
     is_road_race_model,
     pacing_shape_multiplier,
     durability_multiplier,
-    tolerance_penalty_scale,
     trail_hill_tolerance_multiplier,
 )
 from race_planners.grade import (
     calculate_segment_grades,
+    estimate_course_gap_multiplier,
     extreme_grade_in_range,
-    gap_factor,
     parse_gpx,
     smooth_elevation,
     weighted_average_grade,
@@ -28,6 +27,7 @@ from race_planners.models import (
     AidStationEta,
     AidStation,
     Course,
+    LoadedCourse,
     PaceSplit,
     PacingConfig,
     PlanResult,
@@ -41,105 +41,7 @@ from race_planners.pacing import (
     TechnicalTrailUltraModel,
 )
 from race_planners.segments import build_segment_summaries
-from race_planners.weather import (
-    average_heat_multiplier_for_duration,
-    segment_heat_multiplier,
-)
-
-
-@dataclass
-class LoadedCourse:
-    course: Course
-    trackpoints: list[TrackPoint]
-    total_distance_km: float
-
-
-_ROAD_EFFORT_FRACTION_TABLE: dict[str, list[tuple[float, float]]] = {
-    "half_marathon": [
-        (80.0, 0.94),
-        (90.0, 0.90),
-        (100.0, 0.85),
-        (110.0, 0.79),
-        (125.0, 0.72),
-        (140.0, 0.62),
-        (160.0, 0.50),
-    ],
-    "road_marathon": [
-        (165.0, 0.74),
-        (180.0, 0.70),
-        (195.0, 0.65),
-        (210.0, 0.60),
-        (225.0, 0.55),
-        (240.0, 0.50),
-        (270.0, 0.45),
-        (300.0, 0.35),
-    ],
-}
-
-
-def road_race_distance_km(race_model: str) -> float | None:
-    distance_map = {
-        "half_marathon": 21.0975,
-        "road_marathon": 42.195,
-    }
-    return distance_map.get(race_model)
-
-
-def _interpolate_road_effort_fraction(duration_min: float, race_model: str) -> float:
-    points = _ROAD_EFFORT_FRACTION_TABLE.get(race_model)
-    if not points:
-        return 0.5
-    if duration_min <= points[0][0]:
-        return points[0][1]
-    for (start_duration, start_fraction), (end_duration, end_fraction) in zip(
-        points, points[1:], strict=False
-    ):
-        if duration_min <= end_duration:
-            blend = (duration_min - start_duration) / max(end_duration - start_duration, 0.01)
-            return start_fraction + ((end_fraction - start_fraction) * blend)
-    return points[-1][1]
-
-
-def estimate_road_best_likely_pace_min_km(
-    race_model: str,
-    lt1_pace_min_km: float,
-    lt2_pace_min_km: float | None,
-) -> float:
-    race_distance_km = road_race_distance_km(race_model)
-    if race_distance_km is None or lt2_pace_min_km is None:
-        return round(float(lt1_pace_min_km), 2)
-
-    lt1_pace = float(lt1_pace_min_km)
-    lt2_pace = float(lt2_pace_min_km)
-    duration_guess = race_distance_km * ((lt1_pace + lt2_pace) / 2.0)
-    pace_min_km = lt1_pace
-
-    for _ in range(24):
-        effort_fraction = _interpolate_road_effort_fraction(duration_guess, race_model)
-        pace_min_km = lt1_pace - ((lt1_pace - lt2_pace) * effort_fraction)
-        updated_duration = pace_min_km * race_distance_km
-        if abs(updated_duration - duration_guess) < 0.01:
-            duration_guess = updated_duration
-            break
-        duration_guess = updated_duration
-
-    return round(pace_min_km, 2)
-
-
-def estimate_road_best_likely_time_min(
-    race_model: str,
-    lt1_pace_min_km: float,
-    lt2_pace_min_km: float | None,
-) -> float:
-    race_distance_km = road_race_distance_km(race_model)
-    if race_distance_km is None:
-        return round(float(lt1_pace_min_km), 2)
-    pace_min_km = estimate_road_best_likely_pace_min_km(
-        race_model,
-        lt1_pace_min_km,
-        lt2_pace_min_km,
-    )
-    return round(pace_min_km * race_distance_km, 2)
+from race_planners.weather import segment_heat_multiplier
 
 
 def load_course_trackpoints(course: Course, smoothing_window: int = 5) -> LoadedCourse:
@@ -152,20 +54,6 @@ def load_course_trackpoints(course: Course, smoothing_window: int = 5) -> Loaded
         trackpoints=graded_points,
         total_distance_km=total_distance_km,
     )
-
-
-def _estimate_course_gap_multiplier(
-    trackpoints: list[TrackPoint], total_distance_km: float
-) -> float:
-    if total_distance_km <= 0:
-        return 1.0
-    grade_sum = 0.0
-    total_segments = max(1, int(total_distance_km))
-    for km in range(1, total_segments + 1):
-        start_m = (km - 1) * 1000
-        end_m = min(km * 1000, total_distance_km * 1000)
-        grade_sum += gap_factor(weighted_average_grade(trackpoints, start_m, end_m))
-    return grade_sum / total_segments
 
 
 def _build_model(
@@ -199,7 +87,7 @@ def _build_model(
         return GapEffortModel(base_pace_min_km=config.marathon_pace_min_km)
 
     if config.target_finish_time_min is not None and total_distance_km > 0:
-        avg_course_gap = _estimate_course_gap_multiplier(trackpoints, total_distance_km)
+        avg_course_gap = estimate_course_gap_multiplier(trackpoints, total_distance_km)
         base_pace = (config.target_finish_time_min / total_distance_km) / max(avg_course_gap, 0.8)
         return GapEffortModel(base_pace_min_km=base_pace)
 
@@ -564,112 +452,6 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         assumptions=assumptions,
         warnings=warnings,
     )
-
-
-def estimate_road_adjusted_best_likely(
-    loaded_course: LoadedCourse,
-    base_time_min: float,
-    peak_temperature_c: float | None,
-    start_time_local: str | None,
-    hill_tolerance: float | None,
-    heat_tolerance: float | None,
-) -> dict[str, float]:
-    course_gap_multiplier = _estimate_course_gap_multiplier(
-        loaded_course.trackpoints,
-        loaded_course.total_distance_km,
-    )
-    course_multiplier = 1.0 + (
-        (course_gap_multiplier - 1.0) * tolerance_penalty_scale(hill_tolerance)
-    )
-
-    adjusted_time_min = base_time_min * course_multiplier
-    average_heat_multiplier = 1.0
-    weather_multiplier = 1.0
-    for _ in range(4):
-        average_heat_multiplier = average_heat_multiplier_for_duration(
-            peak_temperature_c,
-            start_time_local,
-            adjusted_time_min,
-        )
-        weather_multiplier = 1.0 + (
-            (average_heat_multiplier - 1.0) * tolerance_penalty_scale(heat_tolerance)
-        )
-        adjusted_time_min = base_time_min * course_multiplier * weather_multiplier
-
-    return {
-        "base_time_min": round(base_time_min, 2),
-        "course_multiplier": round(course_multiplier, 4),
-        "weather_multiplier": round(weather_multiplier, 4),
-        "average_heat_multiplier": round(average_heat_multiplier, 4),
-        "adjusted_time_min": round(adjusted_time_min, 2),
-    }
-
-
-def estimate_road_intent_target_time_min(
-    adjusted_best_likely_time_min: float, race_intent: str
-) -> float:
-    intent_multiplier = {
-        "best_effort": 1.00,
-        "strong": 1.02,
-        "controlled": 1.05,
-        "easy_durable": 1.09,
-    }.get(race_intent, 1.05)
-    return round(adjusted_best_likely_time_min * intent_multiplier, 2)
-
-
-def _road_target_delta_percent(
-    adjusted_best_likely_time_min: float, chosen_target_time_min: float
-) -> float:
-    if adjusted_best_likely_time_min <= 0:
-        return 0.0
-    return (
-        (chosen_target_time_min - adjusted_best_likely_time_min) / adjusted_best_likely_time_min
-    ) * 100.0
-
-
-def classify_road_feasibility(
-    adjusted_best_likely_time_min: float, chosen_target_time_min: float
-) -> str:
-    delta_percent = _road_target_delta_percent(
-        adjusted_best_likely_time_min, chosen_target_time_min
-    )
-    if delta_percent >= 6.0:
-        return "Very High"
-    if delta_percent >= 2.0:
-        return "Reasonable"
-    if delta_percent >= -1.5:
-        return "Stretch"
-    return "Aggressive"
-
-
-def classify_road_effort_band(
-    adjusted_best_likely_time_min: float, chosen_target_time_min: float
-) -> str:
-    delta_percent = _road_target_delta_percent(
-        adjusted_best_likely_time_min, chosen_target_time_min
-    )
-    if delta_percent >= 8.0:
-        return "Controlled"
-    if delta_percent >= 3.0:
-        return "Strong"
-    if delta_percent >= -1.0:
-        return "Near Limit"
-    return "Maximal"
-
-
-def classify_road_recovery_cost(
-    adjusted_best_likely_time_min: float, chosen_target_time_min: float
-) -> str:
-    delta_percent = _road_target_delta_percent(
-        adjusted_best_likely_time_min, chosen_target_time_min
-    )
-    if delta_percent >= 8.0:
-        return "Low"
-    if delta_percent >= 3.0:
-        return "Moderate"
-    if delta_percent >= -1.0:
-        return "High"
-    return "Very High"
 
 
 def _pacing_context_for_range(

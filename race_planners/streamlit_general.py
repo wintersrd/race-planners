@@ -26,6 +26,9 @@ from race_planners.plan_io import (
 )
 from race_planners.planner import (
     calculate_plan,
+    load_course_trackpoints,
+)
+from race_planners.road_capability import (
     classify_road_effort_band,
     classify_road_feasibility,
     classify_road_recovery_cost,
@@ -33,8 +36,7 @@ from race_planners.planner import (
     estimate_road_best_likely_time_min,
     estimate_road_adjusted_best_likely,
     estimate_road_intent_target_time_min,
-    load_course_trackpoints,
-    road_race_distance_km as planner_road_race_distance_km,
+    road_race_distance_km,
 )
 
 
@@ -310,10 +312,6 @@ def _road_anchor_default_from_profile(
     )
 
 
-def _road_race_distance_km(race_model: str) -> float | None:
-    return planner_road_race_distance_km(race_model)
-
-
 def _modeled_road_best_likely_time_min(
     athlete_profile: dict[str, Any], race_model: str
 ) -> float | None:
@@ -332,7 +330,7 @@ def _selected_road_capability_pace_min_km(
     athlete_profile: dict[str, Any], race_model: str
 ) -> float | None:
     selected_time_min, selected_source = _selected_road_capability(athlete_profile, race_model)
-    race_distance_km = _road_race_distance_km(race_model)
+    race_distance_km = road_race_distance_km(race_model)
     if selected_time_min is None or race_distance_km is None:
         return None
     if selected_source == "LT-Derived Model":
@@ -1172,7 +1170,7 @@ def render_general_planner(repo_root: Path) -> None:
                 hide_index=True,
             )
             chosen_target_time_min: float | None = None
-            race_distance_km = _road_race_distance_km(race_model)
+            race_distance_km = road_race_distance_km(race_model)
             if input_mode == "finish_time":
                 chosen_target_time_min = target_finish_time_min
             elif marathon_pace_min_km is not None and race_distance_km is not None:

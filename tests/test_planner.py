@@ -6,6 +6,9 @@ from race_planners.course_library import get_course_by_id
 from race_planners.models import PacingConfig
 from race_planners.planner import (
     calculate_plan,
+    load_course_trackpoints,
+)
+from race_planners.road_capability import (
     classify_road_effort_band,
     classify_road_feasibility,
     classify_road_recovery_cost,
@@ -13,7 +16,6 @@ from race_planners.planner import (
     estimate_road_best_likely_time_min,
     estimate_road_adjusted_best_likely,
     estimate_road_intent_target_time_min,
-    load_course_trackpoints,
 )
 
 
