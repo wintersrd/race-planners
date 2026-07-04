@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, replace
 from typing import Callable
 
@@ -38,6 +37,10 @@ from race_planners.pacing import (
     TechnicalTrailUltraModel,
 )
 from race_planners.segments import build_segment_summaries
+from race_planners.weather import (
+    average_heat_multiplier_for_duration,
+    segment_heat_multiplier,
+)
 
 
 @dataclass
@@ -381,7 +384,7 @@ def _simulate_total_time(
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
         pace_min_km *= durability_multiplier(config, context)
         pace_min_km *= trail_hill_tolerance_multiplier(config, context)
-        pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
+        pace_min_km *= segment_heat_multiplier(config, cumulative_time)
         cumulative_time += pace_min_km * fatigue_multiplier(race_model, context.progress_ratio)
 
     remaining = total_distance_km - full_km_count
@@ -394,7 +397,7 @@ def _simulate_total_time(
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
         pace_min_km *= durability_multiplier(config, context)
         pace_min_km *= trail_hill_tolerance_multiplier(config, context)
-        pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
+        pace_min_km *= segment_heat_multiplier(config, cumulative_time)
         cumulative_time += pace_min_km * remaining * fatigue_multiplier(race_model, 1.0)
 
     return cumulative_time
@@ -428,7 +431,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
         pace_min_km *= durability_multiplier(config, context)
         pace_min_km *= trail_hill_tolerance_multiplier(config, context)
-        pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
+        pace_min_km *= segment_heat_multiplier(config, cumulative_time)
         pace_min_km *= fatigue_multiplier(config.race_model, progress_ratio)
         cumulative_time += pace_min_km
         splits.append(
@@ -451,7 +454,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
         pace_min_km *= durability_multiplier(config, context)
         pace_min_km *= trail_hill_tolerance_multiplier(config, context)
-        pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
+        pace_min_km *= segment_heat_multiplier(config, cumulative_time)
         pace_min_km *= fatigue_multiplier(config.race_model, 1.0)
         segment_time = pace_min_km * remaining
         cumulative_time += segment_time
@@ -559,80 +562,6 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
     )
 
 
-_TEMP_PENALTY_TABLE: tuple[tuple[float, float], ...] = (
-    (10.0, 0.0),
-    (15.0, 0.015),
-    (20.0, 0.035),
-    (25.0, 0.065),
-    (28.0, 0.085),
-    (30.0, 0.10),
-    (35.0, 0.15),
-)
-
-
-def _heat_multiplier(temperature_c: float) -> float:
-    if temperature_c <= 10.0:
-        return 1.0
-    if temperature_c >= 35.0:
-        return 1.15 + (temperature_c - 35.0) * 0.005
-    for i in range(len(_TEMP_PENALTY_TABLE) - 1):
-        low_temp, low_penalty = _TEMP_PENALTY_TABLE[i]
-        high_temp, high_penalty = _TEMP_PENALTY_TABLE[i + 1]
-        if low_temp <= temperature_c <= high_temp:
-            fraction = (temperature_c - low_temp) / (high_temp - low_temp)
-            return 1.0 + low_penalty + (high_penalty - low_penalty) * fraction
-    return 1.0
-
-
-def _temperature_at_elapsed(
-    peak_temp_c: float, elapsed_hours: float, start_time_local: str | None
-) -> float:
-    temp_min = peak_temp_c - 12.0
-    if start_time_local:
-        try:
-            parts = start_time_local.split(":")
-            start_hour = float(parts[0]) + (float(parts[1]) / 60.0 if len(parts) > 1 else 0.0)
-        except (ValueError, IndexError):
-            start_hour = 9.0
-    else:
-        start_hour = 9.0
-    wall_hour = (start_hour + elapsed_hours) % 24.0
-    phase = 2.0 * math.pi * ((wall_hour - 4.0) / 24.0)
-    return temp_min + (peak_temp_c - temp_min) * 0.5 * (1.0 - math.cos(phase))
-
-
-def _segment_heat_multiplier(config: PacingConfig, cumulative_time_min: float) -> float:
-    if config.peak_temperature_c is None:
-        return 1.0
-    temp = _temperature_at_elapsed(
-        config.peak_temperature_c,
-        cumulative_time_min / 60.0,
-        config.event_start_time_local,
-    )
-    raw_heat_multiplier = _heat_multiplier(temp)
-    return 1.0 + (
-        (raw_heat_multiplier - 1.0) * tolerance_penalty_scale(config.athlete_heat_tolerance)
-    )
-
-
-def _average_heat_multiplier_for_duration(
-    peak_temperature_c: float | None,
-    start_time_local: str | None,
-    duration_min: float,
-) -> float:
-    if peak_temperature_c is None or duration_min <= 0:
-        return 1.0
-
-    sample_count = max(3, min(24, int(math.ceil(duration_min / 30.0))))
-    total_multiplier = 0.0
-    for index in range(sample_count):
-        elapsed_hours = (duration_min * ((index + 0.5) / sample_count)) / 60.0
-        total_multiplier += _heat_multiplier(
-            _temperature_at_elapsed(peak_temperature_c, elapsed_hours, start_time_local)
-        )
-    return total_multiplier / sample_count
-
-
 def estimate_road_adjusted_best_likely(
     loaded_course: LoadedCourse,
     base_time_min: float,
@@ -653,7 +582,7 @@ def estimate_road_adjusted_best_likely(
     average_heat_multiplier = 1.0
     weather_multiplier = 1.0
     for _ in range(4):
-        average_heat_multiplier = _average_heat_multiplier_for_duration(
+        average_heat_multiplier = average_heat_multiplier_for_duration(
             peak_temperature_c,
             start_time_local,
             adjusted_time_min,
