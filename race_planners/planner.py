@@ -39,6 +39,94 @@ class LoadedCourse:
     total_distance_km: float
 
 
+_ROAD_EFFORT_FRACTION_TABLE: dict[str, list[tuple[float, float]]] = {
+    "half_marathon": [
+        (80.0, 0.97),
+        (90.0, 0.93),
+        (100.0, 0.88),
+        (110.0, 0.82),
+        (125.0, 0.72),
+        (140.0, 0.62),
+        (160.0, 0.50),
+    ],
+    "road_marathon": [
+        (165.0, 0.88),
+        (180.0, 0.83),
+        (195.0, 0.77),
+        (210.0, 0.70),
+        (225.0, 0.63),
+        (240.0, 0.56),
+        (270.0, 0.45),
+        (300.0, 0.35),
+    ],
+}
+
+
+def road_race_distance_km(race_model: str) -> float | None:
+    distance_map = {
+        "half_marathon": 21.0975,
+        "road_marathon": 42.195,
+    }
+    return distance_map.get(race_model)
+
+
+def _interpolate_road_effort_fraction(duration_min: float, race_model: str) -> float:
+    points = _ROAD_EFFORT_FRACTION_TABLE.get(race_model)
+    if not points:
+        return 0.5
+    if duration_min <= points[0][0]:
+        return points[0][1]
+    for (start_duration, start_fraction), (end_duration, end_fraction) in zip(
+        points, points[1:], strict=False
+    ):
+        if duration_min <= end_duration:
+            blend = (duration_min - start_duration) / max(end_duration - start_duration, 0.01)
+            return start_fraction + ((end_fraction - start_fraction) * blend)
+    return points[-1][1]
+
+
+def estimate_road_best_likely_pace_min_km(
+    race_model: str,
+    lt1_pace_min_km: float,
+    lt2_pace_min_km: float | None,
+) -> float:
+    race_distance_km = road_race_distance_km(race_model)
+    if race_distance_km is None or lt2_pace_min_km is None:
+        return round(float(lt1_pace_min_km), 2)
+
+    lt1_pace = float(lt1_pace_min_km)
+    lt2_pace = float(lt2_pace_min_km)
+    duration_guess = race_distance_km * ((lt1_pace + lt2_pace) / 2.0)
+    pace_min_km = lt1_pace
+
+    for _ in range(24):
+        effort_fraction = _interpolate_road_effort_fraction(duration_guess, race_model)
+        pace_min_km = lt1_pace - ((lt1_pace - lt2_pace) * effort_fraction)
+        updated_duration = pace_min_km * race_distance_km
+        if abs(updated_duration - duration_guess) < 0.01:
+            duration_guess = updated_duration
+            break
+        duration_guess = updated_duration
+
+    return round(pace_min_km, 2)
+
+
+def estimate_road_best_likely_time_min(
+    race_model: str,
+    lt1_pace_min_km: float,
+    lt2_pace_min_km: float | None,
+) -> float:
+    race_distance_km = road_race_distance_km(race_model)
+    if race_distance_km is None:
+        return round(float(lt1_pace_min_km), 2)
+    pace_min_km = estimate_road_best_likely_pace_min_km(
+        race_model,
+        lt1_pace_min_km,
+        lt2_pace_min_km,
+    )
+    return round(pace_min_km * race_distance_km, 2)
+
+
 def load_course_trackpoints(course: Course, smoothing_window: int = 5) -> LoadedCourse:
     raw_points = parse_gpx(str(course.gpx_path))
     smooth_points = smooth_elevation(raw_points, window_size=smoothing_window)

@@ -23,7 +23,13 @@ from race_planners.plan_io import (
     export_plan_json,
     import_plan_json,
 )
-from race_planners.planner import calculate_plan, load_course_trackpoints
+from race_planners.planner import (
+    calculate_plan,
+    estimate_road_best_likely_pace_min_km,
+    estimate_road_best_likely_time_min,
+    load_course_trackpoints,
+    road_race_distance_km as planner_road_race_distance_km,
+)
 
 
 def _course_overview_rows(total_distance_km: float, event: CuratedEvent) -> list[dict[str, str]]:
@@ -284,31 +290,48 @@ def _road_anchor_default_from_profile(
     if lt1_pace is None:
         return None
 
-    lt1 = float(lt1_pace)
-    lt2_pace = athlete_profile.get("lt2_pace_min_km")
-    if race_model == "half_marathon" and lt2_pace is not None:
-        lt2 = float(lt2_pace)
-        return round((lt1 * 0.7) + (lt2 * 0.3), 2)
-
-    return round(lt1, 2)
+    return estimate_road_best_likely_pace_min_km(
+        race_model,
+        float(lt1_pace),
+        athlete_profile.get("lt2_pace_min_km"),
+    )
 
 
 def _road_race_distance_km(race_model: str) -> float | None:
-    distance_map = {
-        "half_marathon": 21.0975,
-        "road_marathon": 42.195,
-    }
-    return distance_map.get(race_model)
+    return planner_road_race_distance_km(race_model)
 
 
 def _modeled_road_best_likely_time_min(
     athlete_profile: dict[str, Any], race_model: str
 ) -> float | None:
     anchor_pace_min_km = _road_anchor_default_from_profile(athlete_profile, race_model)
-    race_distance_km = _road_race_distance_km(race_model)
-    if anchor_pace_min_km is None or race_distance_km is None:
+    lt1_pace_min_km = athlete_profile.get("lt1_pace_min_km")
+    if anchor_pace_min_km is None or lt1_pace_min_km is None:
         return None
-    return round(anchor_pace_min_km * race_distance_km, 2)
+    return estimate_road_best_likely_time_min(
+        race_model,
+        float(lt1_pace_min_km),
+        athlete_profile.get("lt2_pace_min_km"),
+    )
+
+
+def _selected_road_capability_pace_min_km(
+    athlete_profile: dict[str, Any], race_model: str
+) -> float | None:
+    selected_time_min, selected_source = _selected_road_capability(athlete_profile, race_model)
+    race_distance_km = _road_race_distance_km(race_model)
+    if selected_time_min is None or race_distance_km is None:
+        return None
+    if selected_source == "LT-Derived Model":
+        lt1_pace_min_km = athlete_profile.get("lt1_pace_min_km")
+        if lt1_pace_min_km is None:
+            return round(selected_time_min / race_distance_km, 2)
+        return estimate_road_best_likely_pace_min_km(
+            race_model,
+            float(lt1_pace_min_km),
+            athlete_profile.get("lt2_pace_min_km"),
+        )
+    return round(selected_time_min / race_distance_km, 2)
 
 
 def _road_capability_sources(

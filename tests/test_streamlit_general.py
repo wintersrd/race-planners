@@ -263,7 +263,8 @@ def test_default_config_for_road_event_uses_profile_split_bias(tmp_path: Path) -
         },
     )
 
-    assert config["marathon_pace_min_km"] == 4.78
+    assert config["marathon_pace_min_km"] is not None
+    assert 4.25 <= config["marathon_pace_min_km"] <= 5.0
     assert config["pacing_bias"] == -2.5
 
 
@@ -302,8 +303,11 @@ def test_modeled_road_best_likely_time_uses_current_profile_heuristic() -> None:
     half_time_min = _modeled_road_best_likely_time_min(profile, "half_marathon")
     marathon_time_min = _modeled_road_best_likely_time_min(profile, "road_marathon")
 
-    assert half_time_min == 100.85
-    assert marathon_time_min == 210.97
+    assert half_time_min is not None
+    assert marathon_time_min is not None
+    assert 89.65 <= half_time_min <= 105.49
+    assert 179.33 <= marathon_time_min <= 210.97
+    assert marathon_time_min > half_time_min
 
 
 def test_road_capability_sources_marks_selected_source() -> None:
@@ -342,6 +346,28 @@ def test_default_config_for_road_event_uses_selected_capability_time(tmp_path: P
     )
 
     assert config["target_finish_time_min"] == 198.0
+
+
+def test_default_config_for_road_event_uses_modeled_capability_when_no_override(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
+    (tmp_path / "semi-marathon-finistere" / "semi-marathon-du-finistere.gpx").write_text(
+        "<gpx></gpx>", encoding="utf-8"
+    )
+    event = get_curated_event(tmp_path, "semi-marathon-finistere")
+
+    config = _default_config_for_event(
+        event,
+        {
+            "lt1_pace_min_km": 5.0,
+            "lt2_pace_min_km": 4.25,
+        },
+    )
+
+    assert config["target_finish_time_min"] is not None
+    assert config["marathon_pace_min_km"] is not None
+    assert config["target_finish_time_min"] < 105.5
 
 
 def test_derived_hr_guardrail_cap_uses_profile_and_policy() -> None:

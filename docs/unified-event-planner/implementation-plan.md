@@ -153,6 +153,16 @@ Status: In progress
     selected source is visible instead of silently implied
   - added regression coverage for capability-source precedence, modeled road
     best-likely heuristics, and road default seeding from the chosen source
+- Road/athlete Phase 3 completed:
+  - replaced the old static LT-based road anchor heuristic with a duration-
+    sensitive best-likely road solver that iteratively places HM/FM effort
+    between LT1 and LT2 based on event duration
+  - routed both the modeled road capability display and the road default anchor
+    pace through that solver so half marathon and marathon best-likely estimates
+    now respond differently to the same physiology inputs
+  - added regression coverage proving the solver stays within the LT1/LT2 pace
+    envelope, treats marathon pacing more conservatively than half-marathon
+    pacing, and places faster half-marathon athletes nearer LT2 than slower ones
 
 ## Objective
 

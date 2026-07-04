@@ -4,7 +4,12 @@ import pytest
 
 from race_planners.course_library import get_course_by_id
 from race_planners.models import PacingConfig
-from race_planners.planner import calculate_plan, load_course_trackpoints
+from race_planners.planner import (
+    calculate_plan,
+    estimate_road_best_likely_pace_min_km,
+    estimate_road_best_likely_time_min,
+    load_course_trackpoints,
+)
 
 
 def test_calculate_plan_for_marathon_pace_model() -> None:
@@ -452,3 +457,25 @@ def test_heat_curve_handles_multi_day_ultra_without_crash() -> None:
     assert result.total_time_min > 0
     assert result.moving_time_min > 0
     assert any("Weather model applies heat penalty" in a for a in result.assumptions)
+
+
+def test_road_best_likely_solver_stays_between_lt1_and_lt2() -> None:
+    pace_min_km = estimate_road_best_likely_pace_min_km("half_marathon", 5.0, 4.25)
+    time_min = estimate_road_best_likely_time_min("road_marathon", 5.0, 4.25)
+
+    assert 4.25 <= pace_min_km <= 5.0
+    assert (42.195 * 4.25) <= time_min <= (42.195 * 5.0)
+
+
+def test_road_best_likely_solver_places_faster_half_runner_nearer_lt2() -> None:
+    fast_runner_pace = estimate_road_best_likely_pace_min_km("half_marathon", 5.0, 4.25)
+    slower_runner_pace = estimate_road_best_likely_pace_min_km("half_marathon", 7.0, 6.0)
+
+    assert (fast_runner_pace - 4.25) < (slower_runner_pace - 6.0)
+
+
+def test_road_best_likely_solver_returns_more_conservative_marathon_than_half() -> None:
+    half_pace = estimate_road_best_likely_pace_min_km("half_marathon", 5.0, 4.25)
+    marathon_pace = estimate_road_best_likely_pace_min_km("road_marathon", 5.0, 4.25)
+
+    assert marathon_pace > half_pace
