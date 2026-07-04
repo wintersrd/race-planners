@@ -1160,6 +1160,9 @@ def render_general_planner(repo_root: Path) -> None:
                 adjusted_capability["adjusted_time_min"],
                 race_intent,
             )
+            previous_race_intent = str(cfg.get("race_intent") or "controlled")
+            if input_mode == "finish_time" and race_intent != previous_race_intent:
+                target_finish_time_min = suggested_target_time_min
             st.caption(
                 "Adjusted best likely applies course and weather costs, scaled by hill and heat tolerance from the athlete profile."
             )

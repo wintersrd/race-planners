@@ -470,6 +470,7 @@ def test_road_best_likely_solver_stays_between_lt1_and_lt2() -> None:
 
     assert 4.25 <= pace_min_km <= 5.0
     assert (42.195 * 4.25) <= time_min <= (42.195 * 5.0)
+    assert time_min >= 189.5
 
 
 def test_road_best_likely_solver_places_faster_half_runner_nearer_lt2() -> None:
@@ -477,6 +478,14 @@ def test_road_best_likely_solver_places_faster_half_runner_nearer_lt2() -> None:
     slower_runner_pace = estimate_road_best_likely_pace_min_km("half_marathon", 7.0, 6.0)
 
     assert (fast_runner_pace - 4.25) < (slower_runner_pace - 6.0)
+
+
+def test_road_best_likely_solver_is_less_aggressive_for_known_profile_example() -> None:
+    half_time_min = estimate_road_best_likely_time_min("half_marathon", 5.25, 4.25)
+    marathon_time_min = estimate_road_best_likely_time_min("road_marathon", 5.25, 4.25)
+
+    assert 91.5 <= half_time_min <= 95.0
+    assert 193.0 <= marathon_time_min <= 201.0
 
 
 def test_road_best_likely_solver_returns_more_conservative_marathon_than_half() -> None:
