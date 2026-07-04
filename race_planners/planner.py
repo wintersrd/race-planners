@@ -4,6 +4,15 @@ import math
 from dataclasses import dataclass, replace
 from typing import Callable
 
+from race_planners.fatigue import (
+    fade_profile_values,
+    fatigue_multiplier,
+    is_road_race_model,
+    pacing_shape_multiplier,
+    durability_multiplier,
+    tolerance_penalty_scale,
+    trail_hill_tolerance_multiplier,
+)
 from race_planners.grade import (
     calculate_segment_grades,
     extreme_grade_in_range,
@@ -368,12 +377,12 @@ def _simulate_total_time(
             trackpoints, start_m, end_m, km / max(total_distance_km, 1.0), cumulative_time
         )
         pace_min_km = model.pace_for_context(context)
-        pace_min_km *= _pacing_shape_multiplier(config, context.progress_ratio)
+        pace_min_km *= pacing_shape_multiplier(config, context.progress_ratio)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
-        pace_min_km *= _durability_multiplier(config, context)
-        pace_min_km *= _trail_hill_tolerance_multiplier(config, context)
+        pace_min_km *= durability_multiplier(config, context)
+        pace_min_km *= trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
-        cumulative_time += pace_min_km * _fatigue_multiplier(race_model, context.progress_ratio)
+        cumulative_time += pace_min_km * fatigue_multiplier(race_model, context.progress_ratio)
 
     remaining = total_distance_km - full_km_count
     if remaining > 0.01:
@@ -381,12 +390,12 @@ def _simulate_total_time(
         end_m = total_distance_km * 1000
         context = _pacing_context_for_range(trackpoints, start_m, end_m, 1.0, cumulative_time)
         pace_min_km = model.pace_for_context(context)
-        pace_min_km *= _pacing_shape_multiplier(config, 1.0)
+        pace_min_km *= pacing_shape_multiplier(config, 1.0)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
-        pace_min_km *= _durability_multiplier(config, context)
-        pace_min_km *= _trail_hill_tolerance_multiplier(config, context)
+        pace_min_km *= durability_multiplier(config, context)
+        pace_min_km *= trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
-        cumulative_time += pace_min_km * remaining * _fatigue_multiplier(race_model, 1.0)
+        cumulative_time += pace_min_km * remaining * fatigue_multiplier(race_model, 1.0)
 
     return cumulative_time
 
@@ -415,12 +424,12 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
             trackpoints, start_m, end_m, progress_ratio, cumulative_time
         )
         pace_min_km = model.pace_for_context(context)
-        pace_min_km *= _pacing_shape_multiplier(config, progress_ratio)
+        pace_min_km *= pacing_shape_multiplier(config, progress_ratio)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
-        pace_min_km *= _durability_multiplier(config, context)
-        pace_min_km *= _trail_hill_tolerance_multiplier(config, context)
+        pace_min_km *= durability_multiplier(config, context)
+        pace_min_km *= trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
-        pace_min_km *= _fatigue_multiplier(config.race_model, progress_ratio)
+        pace_min_km *= fatigue_multiplier(config.race_model, progress_ratio)
         cumulative_time += pace_min_km
         splits.append(
             PaceSplit(
@@ -438,12 +447,12 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         end_m = total_distance_km * 1000
         context = _pacing_context_for_range(trackpoints, start_m, end_m, 1.0, cumulative_time)
         pace_min_km = model.pace_for_context(context)
-        pace_min_km *= _pacing_shape_multiplier(config, 1.0)
+        pace_min_km *= pacing_shape_multiplier(config, 1.0)
         pace_min_km *= _effort_guardrail_multiplier(config, context, pace_min_km)
-        pace_min_km *= _durability_multiplier(config, context)
-        pace_min_km *= _trail_hill_tolerance_multiplier(config, context)
+        pace_min_km *= durability_multiplier(config, context)
+        pace_min_km *= trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= _segment_heat_multiplier(config, cumulative_time)
-        pace_min_km *= _fatigue_multiplier(config.race_model, 1.0)
+        pace_min_km *= fatigue_multiplier(config.race_model, 1.0)
         segment_time = pace_min_km * remaining
         cumulative_time += segment_time
         splits.append(
@@ -506,9 +515,9 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
     warnings: list[str] = []
     if aid_station_etas and config.rest_duration_sec > 0:
         assumptions.append("Rest stops are modeled as fixed additive pauses.")
-    if _is_road_race_model(config.race_model) and config.pacing_bias != 0:
+    if is_road_race_model(config.race_model) and config.pacing_bias != 0:
         assumptions.append("Pacing bias progressively shifts pace across the course.")
-    if not _is_road_race_model(config.race_model) and any(_fade_profile_values(config)):
+    if not is_road_race_model(config.race_model) and any(fade_profile_values(config)):
         assumptions.append("Fade profile progressively slows pace across the event.")
     if config.effort_policy is not None and config.effort_policy != "steady":
         assumptions.append("Effort policy nudges pacing more conservatively or aggressively.")
@@ -548,23 +557,6 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         assumptions=assumptions,
         warnings=warnings,
     )
-
-
-def _fatigue_multiplier(race_model: str, progress_ratio: float) -> float:
-    ratio = min(max(progress_ratio, 0.0), 1.0)
-    if race_model in {"road_marathon", "half_marathon"}:
-        if ratio <= 0.65:
-            return 1.0
-        return 1.0 + ((ratio - 0.65) / 0.35) * 0.04
-    if race_model == "fire_road_ultra":
-        if ratio <= 0.55:
-            return 1.0
-        return 1.0 + ((ratio - 0.55) / 0.45) * 0.06
-    if race_model == "technical_trail_ultra":
-        if ratio <= 0.5:
-            return 1.0
-        return 1.0 + ((ratio - 0.5) / 0.5) * 0.08
-    return 1.0
 
 
 _TEMP_PENALTY_TABLE: tuple[tuple[float, float], ...] = (
@@ -619,14 +611,8 @@ def _segment_heat_multiplier(config: PacingConfig, cumulative_time_min: float) -
     )
     raw_heat_multiplier = _heat_multiplier(temp)
     return 1.0 + (
-        (raw_heat_multiplier - 1.0) * _tolerance_penalty_scale(config.athlete_heat_tolerance)
+        (raw_heat_multiplier - 1.0) * tolerance_penalty_scale(config.athlete_heat_tolerance)
     )
-
-
-def _tolerance_penalty_scale(tolerance: float | None) -> float:
-    if tolerance is None:
-        return 1.0
-    return min(max(1.0 - (float(tolerance) * 0.25), 0.6), 1.4)
 
 
 def _average_heat_multiplier_for_duration(
@@ -660,7 +646,7 @@ def estimate_road_adjusted_best_likely(
         loaded_course.total_distance_km,
     )
     course_multiplier = 1.0 + (
-        (course_gap_multiplier - 1.0) * _tolerance_penalty_scale(hill_tolerance)
+        (course_gap_multiplier - 1.0) * tolerance_penalty_scale(hill_tolerance)
     )
 
     adjusted_time_min = base_time_min * course_multiplier
@@ -673,7 +659,7 @@ def estimate_road_adjusted_best_likely(
             adjusted_time_min,
         )
         weather_multiplier = 1.0 + (
-            (average_heat_multiplier - 1.0) * _tolerance_penalty_scale(heat_tolerance)
+            (average_heat_multiplier - 1.0) * tolerance_penalty_scale(heat_tolerance)
         )
         adjusted_time_min = base_time_min * course_multiplier * weather_multiplier
 
@@ -753,52 +739,6 @@ def classify_road_recovery_cost(
     return "Very High"
 
 
-def _is_road_race_model(race_model: str) -> bool:
-    return race_model in {"road_marathon", "half_marathon"}
-
-
-def _pacing_bias_multiplier(pacing_bias: float, progress_ratio: float) -> float:
-    ratio = min(max(progress_ratio, 0.0), 1.0)
-    return max(0.85, 1.0 + (pacing_bias * 0.005 * ratio))
-
-
-def _fade_profile_values(config: PacingConfig) -> tuple[float, float, float]:
-    if None not in (config.fade_early_bias, config.fade_mid_bias, config.fade_late_bias):
-        return (
-            float(config.fade_early_bias or 0.0),
-            float(config.fade_mid_bias or 0.0),
-            float(config.fade_late_bias or 0.0),
-        )
-
-    preset_map = {
-        "stable": (0.0, 0.75, 1.5),
-        "late_fade": (0.0, 1.25, 3.5),
-        "progressive_fade": (0.5, 2.0, 4.5),
-        "blow_up_risk": (1.5, 4.0, 7.0),
-    }
-    return preset_map.get(config.fade_profile_preset or "stable", preset_map["stable"])
-
-
-def _interpolated_fade_bias(config: PacingConfig, progress_ratio: float) -> float:
-    early_bias, mid_bias, late_bias = _fade_profile_values(config)
-    ratio = min(max(progress_ratio, 0.0), 1.0)
-    if ratio <= 0.33:
-        return early_bias * (ratio / 0.33)
-    if ratio <= 0.66:
-        blend = (ratio - 0.33) / 0.33
-        return early_bias + ((mid_bias - early_bias) * blend)
-    blend = (ratio - 0.66) / 0.34
-    return mid_bias + ((late_bias - mid_bias) * blend)
-
-
-def _pacing_shape_multiplier(config: PacingConfig, progress_ratio: float) -> float:
-    if _is_road_race_model(config.race_model):
-        return _pacing_bias_multiplier(config.pacing_bias, progress_ratio)
-
-    fade_bias = _interpolated_fade_bias(config, progress_ratio)
-    return max(0.85, 1.0 + (fade_bias * 0.006))
-
-
 def _effort_policy_rpe_target(config: PacingConfig) -> float | None:
     if config.rpe_target is not None:
         return config.rpe_target
@@ -808,32 +748,6 @@ def _effort_policy_rpe_target(config: PacingConfig) -> float | None:
         "aggressive": 7.5,
     }
     return policy_map.get(config.effort_policy or "", None)
-
-
-def _trail_hill_tolerance_multiplier(config: PacingConfig, context: PacingContext) -> float:
-    if _is_road_race_model(config.race_model):
-        return 1.0
-
-    terrain_load = max(
-        max(context.steepest_climb_percent, 0.0) / 20.0,
-        abs(min(context.steepest_descent_percent, 0.0)) / 20.0,
-        context.climb_m_per_km / 35.0,
-    )
-    terrain_load = min(max(terrain_load, 0.0), 1.5)
-    tolerance = float(config.athlete_hill_tolerance or 0.0)
-    return min(max(1.0 - (tolerance * 0.12 * terrain_load), 0.85), 1.15)
-
-
-def _durability_multiplier(config: PacingConfig, context: PacingContext) -> float:
-    durability = float(config.athlete_durability_factor or 0.0)
-    if durability == 0.0:
-        return 1.0
-
-    progress_load = min(max(context.progress_ratio, 0.0), 1.0) ** 2.4
-    duration_load = min(max(context.elapsed_hours / 8.0, 0.0), 2.0)
-    breakdown_load = progress_load * duration_load
-    multiplier = min(max(1.0 - (durability * 0.08 * breakdown_load), 0.8), 1.2)
-    return float(multiplier)
 
 
 def _hr_guardrail_phase_offsets(config: PacingConfig) -> tuple[float, float, float]:

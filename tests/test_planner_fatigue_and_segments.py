@@ -1,12 +1,12 @@
-from race_planners.planner import _fatigue_multiplier
+from race_planners.fatigue import fatigue_multiplier
 from race_planners.segments import build_segment_summaries
 from race_planners.models import AidStation, PaceSplit
 
 
-def test_fatigue_multiplier_progresses_by_model() -> None:
-    assert _fatigue_multiplier("road_marathon", 0.5) == 1.0
-    assert _fatigue_multiplier("road_marathon", 1.0) > 1.0
-    assert _fatigue_multiplier("technical_trail_ultra", 1.0) > _fatigue_multiplier(
+def testfatigue_multiplier_progresses_by_model() -> None:
+    assert fatigue_multiplier("road_marathon", 0.5) == 1.0
+    assert fatigue_multiplier("road_marathon", 1.0) > 1.0
+    assert fatigue_multiplier("technical_trail_ultra", 1.0) > fatigue_multiplier(
         "road_marathon", 1.0
     )
 
