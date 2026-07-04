@@ -78,8 +78,16 @@ class AthleteProfile:
     lt1_pace_min_km: float | None = None
     lt2_hr: int | None = None
     lt2_pace_min_km: float | None = None
+    best_likely_half_time_min: float | None = None
+    best_likely_marathon_time_min: float | None = None
+    predictor_half_time_min: float | None = None
+    predictor_marathon_time_min: float | None = None
+    predictor_source: str | None = None
     flat_trail_slowdown_sec_km: float | None = None
     technical_trail_slowdown_sec_km: float | None = None
+    durability_factor: float | None = None
+    heat_tolerance: float | None = None
+    hill_tolerance: float | None = None
     default_road_split_bias: float | None = None
     default_trail_fade_preset: str | None = None
     default_trail_effort_policy: str | None = None

@@ -127,6 +127,22 @@ Status: In progress
   - replaced raw user-facing RPE/HR controls with higher-level trail effort
     policy and derived guardrail behavior while preserving backend flexibility
     through the canonical planner config
+- Road and athlete model execution plan added:
+  - documented the next implementation sequence for capability-source
+    precedence, duration-sensitive road solving, event-adjusted best-likely
+    outputs, universal tolerance factors, and intent-driven feasibility
+    reporting
+  - recorded the shared athlete model direction so road and trail refinements can
+    proceed from one reference instead of ad hoc UI-only changes
+- Road/athlete Phase 1 completed:
+  - expanded athlete profile schema with manual best-likely HM/FM fields,
+    predictor HM/FM fields and source, plus universal durability, heat-tolerance,
+    and hill-tolerance factors
+  - exposed those new fields in the saved athlete profile UI so the planner has a
+    stable persistence layer before capability-source and road-solver logic are
+    added
+  - added regression coverage proving the expanded athlete profile survives plan
+    JSON restoration and that the new schema fields round-trip correctly
 
 ## Objective
 

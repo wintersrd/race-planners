@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from race_planners.event_catalog import get_curated_event
-from race_planners.models import PacingConfig, PaceSplit, TrackPoint
+from race_planners.models import AthleteProfile, PacingConfig, PaceSplit, TrackPoint
 from race_planners.plan_io import export_plan_json
 from race_planners.streamlit_general import (
     _aggregate_split_rows,
@@ -98,6 +98,66 @@ def test_load_plan_into_state_restores_athlete_profile(tmp_path: Path) -> None:
     assert error is None
     assert state["general_athlete_profile"]["lt1_hr"] == 152
     assert state["general_athlete_profile"]["lt1_pace_min_km"] == 5.0
+
+
+def test_load_plan_into_state_restores_expanded_athlete_profile_fields(tmp_path: Path) -> None:
+    course_dir = tmp_path / "semi-marathon-finistere"
+    course_dir.mkdir(parents=True)
+    (course_dir / "semi-marathon-du-finistere.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+
+    payload_json = export_plan_json(
+        course_id="semi-marathon-finistere",
+        gpx_filename="semi-marathon-du-finistere.gpx",
+        config=PacingConfig(race_model="half_marathon", input_mode="finish_time"),
+        athlete_profile={
+            "best_likely_half_time_min": 86.0,
+            "best_likely_marathon_time_min": 195.0,
+            "predictor_half_time_min": 88.0,
+            "predictor_marathon_time_min": 198.0,
+            "predictor_source": "COROS",
+            "durability_factor": 0.4,
+            "heat_tolerance": -0.2,
+            "hill_tolerance": 0.1,
+        },
+    )
+
+    state, error = load_plan_into_state(
+        payload_json,
+        tmp_path,
+        {"general_config": {}, "general_course_id": "x", "general_athlete_profile": {}},
+    )
+
+    assert error is None
+    assert state["general_athlete_profile"]["best_likely_half_time_min"] == 86.0
+    assert state["general_athlete_profile"]["best_likely_marathon_time_min"] == 195.0
+    assert state["general_athlete_profile"]["predictor_half_time_min"] == 88.0
+    assert state["general_athlete_profile"]["predictor_marathon_time_min"] == 198.0
+    assert state["general_athlete_profile"]["predictor_source"] == "COROS"
+    assert state["general_athlete_profile"]["durability_factor"] == 0.4
+    assert state["general_athlete_profile"]["heat_tolerance"] == -0.2
+    assert state["general_athlete_profile"]["hill_tolerance"] == 0.1
+
+
+def test_athlete_profile_dataclass_round_trips_new_fields() -> None:
+    profile = AthleteProfile(
+        best_likely_half_time_min=86.0,
+        best_likely_marathon_time_min=195.0,
+        predictor_half_time_min=88.0,
+        predictor_marathon_time_min=198.0,
+        predictor_source="COROS",
+        durability_factor=0.3,
+        heat_tolerance=-0.1,
+        hill_tolerance=0.2,
+    )
+
+    assert profile.best_likely_half_time_min == 86.0
+    assert profile.best_likely_marathon_time_min == 195.0
+    assert profile.predictor_half_time_min == 88.0
+    assert profile.predictor_marathon_time_min == 198.0
+    assert profile.predictor_source == "COROS"
+    assert profile.durability_factor == 0.3
+    assert profile.heat_tolerance == -0.1
+    assert profile.hill_tolerance == 0.2
 
 
 def test_course_overview_rows_reflect_event_metadata(tmp_path: Path) -> None:

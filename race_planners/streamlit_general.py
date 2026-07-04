@@ -779,6 +779,42 @@ def render_general_planner(repo_root: Path) -> None:
                 )
             )
 
+            st.markdown("#### Road Capability")
+            athlete_profile["best_likely_half_time_min"] = _parse_optional_number(
+                st.text_input(
+                    "Best Likely Half Marathon (min)",
+                    _profile_text(athlete_profile, "best_likely_half_time_min"),
+                    help="Manual best-likely half-marathon result in neutral conditions. This will outrank derived estimates later.",
+                )
+            )
+            athlete_profile["best_likely_marathon_time_min"] = _parse_optional_number(
+                st.text_input(
+                    "Best Likely Marathon (min)",
+                    _profile_text(athlete_profile, "best_likely_marathon_time_min"),
+                    help="Manual best-likely marathon result in neutral conditions. This will outrank derived estimates later.",
+                )
+            )
+            athlete_profile["predictor_half_time_min"] = _parse_optional_number(
+                st.text_input(
+                    "Predictor Half Marathon (min)",
+                    _profile_text(athlete_profile, "predictor_half_time_min"),
+                    help="Optional external estimate such as COROS, Strava, or Intervals.icu.",
+                )
+            )
+            athlete_profile["predictor_marathon_time_min"] = _parse_optional_number(
+                st.text_input(
+                    "Predictor Marathon (min)",
+                    _profile_text(athlete_profile, "predictor_marathon_time_min"),
+                    help="Optional external marathon estimate from a trusted predictor source.",
+                )
+            )
+            predictor_source = st.text_input(
+                "Predictor Source",
+                _profile_text(athlete_profile, "predictor_source"),
+                help="Short source label such as COROS, Strava, Intervals.icu, or coach estimate.",
+            ).strip()
+            athlete_profile["predictor_source"] = predictor_source or None
+
             st.markdown("#### Trail Adjustments")
             athlete_profile["flat_trail_slowdown_sec_km"] = _parse_optional_number(
                 st.text_input(
@@ -793,6 +829,32 @@ def render_general_planner(repo_root: Path) -> None:
                     _profile_text(athlete_profile, "technical_trail_slowdown_sec_km"),
                     help="Extra slowdown on technical trail compared with road pace.",
                 )
+            )
+
+            st.markdown("#### Universal Factors")
+            athlete_profile["durability_factor"] = st.slider(
+                "Durability Factor",
+                min_value=-1.0,
+                max_value=1.0,
+                value=float(athlete_profile.get("durability_factor") or 0.0),
+                step=0.1,
+                help="General late-race resilience. Higher means you hold pace better deep into long events.",
+            )
+            athlete_profile["heat_tolerance"] = st.slider(
+                "Heat Tolerance",
+                min_value=-1.0,
+                max_value=1.0,
+                value=float(athlete_profile.get("heat_tolerance") or 0.0),
+                step=0.1,
+                help="How well you cope with warmer conditions across road and trail events.",
+            )
+            athlete_profile["hill_tolerance"] = st.slider(
+                "Hill Tolerance",
+                min_value=-1.0,
+                max_value=1.0,
+                value=float(athlete_profile.get("hill_tolerance") or 0.0),
+                step=0.1,
+                help="How well you convert fitness into performance on rolling or hilly courses.",
             )
 
             st.markdown("#### Preferences")
