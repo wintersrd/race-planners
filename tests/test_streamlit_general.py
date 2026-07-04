@@ -346,6 +346,7 @@ def test_default_config_for_road_event_uses_selected_capability_time(tmp_path: P
     )
 
     assert config["target_finish_time_min"] == 198.0
+    assert config["race_intent"] == "controlled"
 
 
 def test_default_config_for_road_event_uses_modeled_capability_when_no_override(

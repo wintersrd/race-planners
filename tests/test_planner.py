@@ -6,9 +6,13 @@ from race_planners.course_library import get_course_by_id
 from race_planners.models import PacingConfig
 from race_planners.planner import (
     calculate_plan,
+    classify_road_effort_band,
+    classify_road_feasibility,
+    classify_road_recovery_cost,
     estimate_road_best_likely_pace_min_km,
     estimate_road_best_likely_time_min,
     estimate_road_adjusted_best_likely,
+    estimate_road_intent_target_time_min,
     load_course_trackpoints,
 )
 
@@ -524,3 +528,19 @@ def test_road_adjusted_best_likely_respects_tolerance_modifiers() -> None:
     )
 
     assert tolerant["adjusted_time_min"] < intolerant["adjusted_time_min"]
+
+
+def test_road_intent_target_time_and_labels_shift_with_intent() -> None:
+    adjusted_best_likely_time_min = 200.0
+
+    best_effort = estimate_road_intent_target_time_min(adjusted_best_likely_time_min, "best_effort")
+    controlled = estimate_road_intent_target_time_min(adjusted_best_likely_time_min, "controlled")
+    easy = estimate_road_intent_target_time_min(adjusted_best_likely_time_min, "easy_durable")
+
+    assert best_effort < controlled < easy
+    assert classify_road_feasibility(adjusted_best_likely_time_min, easy) == "Very High"
+    assert classify_road_feasibility(adjusted_best_likely_time_min, best_effort) == "Stretch"
+    assert classify_road_effort_band(adjusted_best_likely_time_min, easy) == "Controlled"
+    assert classify_road_effort_band(adjusted_best_likely_time_min, best_effort) == "Near Limit"
+    assert classify_road_recovery_cost(adjusted_best_likely_time_min, easy) == "Low"
+    assert classify_road_recovery_cost(adjusted_best_likely_time_min, best_effort) == "High"

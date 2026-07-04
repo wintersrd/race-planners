@@ -676,6 +676,73 @@ def estimate_road_adjusted_best_likely(
     }
 
 
+def estimate_road_intent_target_time_min(
+    adjusted_best_likely_time_min: float, race_intent: str
+) -> float:
+    intent_multiplier = {
+        "best_effort": 1.00,
+        "strong": 1.02,
+        "controlled": 1.05,
+        "easy_durable": 1.09,
+    }.get(race_intent, 1.05)
+    return round(adjusted_best_likely_time_min * intent_multiplier, 2)
+
+
+def _road_target_delta_percent(
+    adjusted_best_likely_time_min: float, chosen_target_time_min: float
+) -> float:
+    if adjusted_best_likely_time_min <= 0:
+        return 0.0
+    return (
+        (chosen_target_time_min - adjusted_best_likely_time_min) / adjusted_best_likely_time_min
+    ) * 100.0
+
+
+def classify_road_feasibility(
+    adjusted_best_likely_time_min: float, chosen_target_time_min: float
+) -> str:
+    delta_percent = _road_target_delta_percent(
+        adjusted_best_likely_time_min, chosen_target_time_min
+    )
+    if delta_percent >= 6.0:
+        return "Very High"
+    if delta_percent >= 2.0:
+        return "Reasonable"
+    if delta_percent >= -1.5:
+        return "Stretch"
+    return "Aggressive"
+
+
+def classify_road_effort_band(
+    adjusted_best_likely_time_min: float, chosen_target_time_min: float
+) -> str:
+    delta_percent = _road_target_delta_percent(
+        adjusted_best_likely_time_min, chosen_target_time_min
+    )
+    if delta_percent >= 8.0:
+        return "Controlled"
+    if delta_percent >= 3.0:
+        return "Strong"
+    if delta_percent >= -1.0:
+        return "Near Limit"
+    return "Maximal"
+
+
+def classify_road_recovery_cost(
+    adjusted_best_likely_time_min: float, chosen_target_time_min: float
+) -> str:
+    delta_percent = _road_target_delta_percent(
+        adjusted_best_likely_time_min, chosen_target_time_min
+    )
+    if delta_percent >= 8.0:
+        return "Low"
+    if delta_percent >= 3.0:
+        return "Moderate"
+    if delta_percent >= -1.0:
+        return "High"
+    return "Very High"
+
+
 def _is_road_race_model(race_model: str) -> bool:
     return race_model in {"road_marathon", "half_marathon"}
 

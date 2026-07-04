@@ -173,6 +173,17 @@ Status: In progress
   - added regression coverage proving hotter and hillier road events slow the
     adjusted best-likely outcome and that tolerance factors materially reduce or
     amplify that penalty
+- Road/athlete Phase 5 completed:
+  - added categorical road race intent (`Best Effort`, `Strong`, `Controlled`,
+    `Easy / Durable`) and stored it in planner configuration for road events
+  - derived intent-based suggested targets plus user-facing feasibility,
+    expected-effort, and recovery-cost labels by comparing the chosen target to
+    event-adjusted best likely
+  - surfaced those road intent outputs in the unified planner so marathon and
+    half-marathon planning can be interpreted as deliberate choices rather than
+    only raw target times
+  - added regression coverage proving intent shifts suggested targets and the
+    derived feasibility / effort / recovery labels in the expected direction
 
 ## Objective
 

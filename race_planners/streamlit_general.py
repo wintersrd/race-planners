@@ -25,9 +25,13 @@ from race_planners.plan_io import (
 )
 from race_planners.planner import (
     calculate_plan,
+    classify_road_effort_band,
+    classify_road_feasibility,
+    classify_road_recovery_cost,
     estimate_road_best_likely_pace_min_km,
     estimate_road_best_likely_time_min,
     estimate_road_adjusted_best_likely,
+    estimate_road_intent_target_time_min,
     load_course_trackpoints,
     road_race_distance_km as planner_road_race_distance_km,
 )
@@ -208,6 +212,13 @@ EFFORT_POLICY_PRESETS: dict[str, tuple[str, float]] = {
     "conservative": ("Conservative", 4.5),
     "steady": ("Steady", 6.0),
     "aggressive": ("Aggressive", 7.5),
+}
+
+ROAD_INTENT_PRESETS: dict[str, str] = {
+    "best_effort": "Best Effort",
+    "strong": "Strong",
+    "controlled": "Controlled",
+    "easy_durable": "Easy / Durable",
 }
 
 
@@ -472,6 +483,7 @@ def _default_config() -> dict[str, Any]:
         "fade_early_bias": None,
         "fade_mid_bias": None,
         "fade_late_bias": None,
+        "race_intent": None,
         "effort_policy": None,
         "use_hr_guardrail": False,
         "rpe_target": None,
@@ -494,6 +506,7 @@ def _default_config_for_event(
         )
         config["target_finish_time_min"] = selected_capability_time_min or 105.0
         config["rest_duration_sec"] = 10
+        config["race_intent"] = "controlled"
         config["marathon_pace_min_km"] = _road_anchor_default_from_profile(
             athlete_profile,
             event.race_model,
@@ -505,6 +518,7 @@ def _default_config_for_event(
         )
         config["target_finish_time_min"] = selected_capability_time_min or 240.0
         config["rest_duration_sec"] = 15
+        config["race_intent"] = "controlled"
         config["marathon_pace_min_km"] = _road_anchor_default_from_profile(
             athlete_profile,
             event.race_model,
@@ -603,6 +617,7 @@ def render_general_planner(repo_root: Path) -> None:
     pacing_bias = float(cfg.get("pacing_bias", 0.0))
     fade_profile_preset = str(cfg.get("fade_profile_preset") or "stable")
     fade_early_bias, fade_mid_bias, fade_late_bias = _fade_profile_values(cfg)
+    race_intent = str(cfg.get("race_intent") or "controlled")
     effort_policy = str(cfg.get("effort_policy") or _derived_effort_policy(athlete_profile))
     use_hr_guardrail = bool(cfg.get("use_hr_guardrail", False))
     derived_hr_cap: int | None = None
@@ -760,6 +775,15 @@ def render_general_planner(repo_root: Path) -> None:
 
         if _is_road_event(selected_event):
             st.markdown("### Race Strategy")
+            race_intent = st.selectbox(
+                "Race Intent",
+                options=list(ROAD_INTENT_PRESETS.keys()),
+                index=list(ROAD_INTENT_PRESETS.keys()).index(
+                    str(cfg.get("race_intent") or "controlled")
+                ),
+                format_func=lambda key: ROAD_INTENT_PRESETS[key],
+                help="How hard you intend to race relative to your event-adjusted best-likely result.",
+            )
             pacing_bias = st.slider(
                 "Split Bias",
                 min_value=-10.0,
@@ -1119,9 +1143,62 @@ def render_general_planner(repo_root: Path) -> None:
                 use_container_width=True,
                 hide_index=True,
             )
+            chosen_target_time_min: float | None = None
+            race_distance_km = _road_race_distance_km(race_model)
+            if input_mode == "finish_time":
+                chosen_target_time_min = target_finish_time_min
+            elif marathon_pace_min_km is not None and race_distance_km is not None:
+                chosen_target_time_min = marathon_pace_min_km * race_distance_km
+
+            suggested_target_time_min = estimate_road_intent_target_time_min(
+                adjusted_capability["adjusted_time_min"],
+                race_intent,
+            )
             st.caption(
                 "Adjusted best likely applies course and weather costs, scaled by hill and heat tolerance from the athlete profile."
             )
+            if chosen_target_time_min is not None:
+                st.dataframe(
+                    pd.DataFrame(
+                        [
+                            {
+                                "Metric": "Race Intent",
+                                "Value": ROAD_INTENT_PRESETS[race_intent],
+                            },
+                            {
+                                "Metric": "Intent Suggested Target",
+                                "Value": _format_duration_minutes(suggested_target_time_min),
+                            },
+                            {
+                                "Metric": "Chosen Target",
+                                "Value": _format_duration_minutes(chosen_target_time_min),
+                            },
+                            {
+                                "Metric": "Feasibility",
+                                "Value": classify_road_feasibility(
+                                    adjusted_capability["adjusted_time_min"],
+                                    chosen_target_time_min,
+                                ),
+                            },
+                            {
+                                "Metric": "Expected Effort",
+                                "Value": classify_road_effort_band(
+                                    adjusted_capability["adjusted_time_min"],
+                                    chosen_target_time_min,
+                                ),
+                            },
+                            {
+                                "Metric": "Recovery Cost",
+                                "Value": classify_road_recovery_cost(
+                                    adjusted_capability["adjusted_time_min"],
+                                    chosen_target_time_min,
+                                ),
+                            },
+                        ]
+                    ),
+                    use_container_width=True,
+                    hide_index=True,
+                )
 
     new_config = PacingConfig(
         race_model=race_model,
@@ -1140,6 +1217,7 @@ def render_general_planner(repo_root: Path) -> None:
         fade_early_bias=None if _is_road_event(selected_event) else fade_early_bias,
         fade_mid_bias=None if _is_road_event(selected_event) else fade_mid_bias,
         fade_late_bias=None if _is_road_event(selected_event) else fade_late_bias,
+        race_intent=race_intent if _is_road_event(selected_event) else None,
         effort_policy=None if _is_road_event(selected_event) else effort_policy,
         use_hr_guardrail=False if _is_road_event(selected_event) else use_hr_guardrail,
         athlete_lt1_hr=athlete_profile.get("lt1_hr"),

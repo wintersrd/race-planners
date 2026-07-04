@@ -111,6 +111,7 @@ class PacingConfig:
     fade_early_bias: float | None = None
     fade_mid_bias: float | None = None
     fade_late_bias: float | None = None
+    race_intent: str | None = None
     effort_policy: str | None = None
     use_hr_guardrail: bool = False
     athlete_lt1_hr: int | None = None
