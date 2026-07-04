@@ -53,6 +53,18 @@ from race_planners.splits import (
 )
 
 
+_AID_TIER_LABELS: dict[str, str] = {
+    "none": "—",
+    "water_only": "Water",
+    "standard": "Water + snacks",
+    "full_service": "Full food (race or drop bag)",
+}
+
+
+def _aid_tier_label(tier: str) -> str:
+    return _AID_TIER_LABELS.get(tier, tier)
+
+
 def render_general_planner(repo_root: Path) -> None:
     st.title("Unified Event Planner")
     st.caption("Choose a curated event and plan it through one event-first pacing flow.")
@@ -896,7 +908,7 @@ def render_general_planner(repo_root: Path) -> None:
                         [
                             {
                                 "block": f"{block.start_km:.1f}-{block.end_km:.1f} km",
-                                "tier": block.aid_station_tier,
+                                "tier": _aid_tier_label(block.aid_station_tier),
                                 "duration": format_duration_minutes(block.duration_min),
                                 "kcal": round(block.kcal_burned),
                                 "carb_target_g": round(block.carb_target_g),

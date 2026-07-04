@@ -73,6 +73,13 @@ def _sweat_rate_l_per_hr(temperature_c: float, athlete_sweat_rate: float | None)
 
 
 def _aid_station_tier_on_site(tier: str) -> tuple[float, float]:
+    """Return (kcal, carb_g) available on-site for a given aid station tier.
+
+    - water_only: just water
+    - standard: basic snacks/drinks provided by the race
+    - full_service: "eat a bunch of stuff" — either race-provided food or your
+      own drop bag waiting there
+    """
     tier_defaults = {
         "water_only": (0.0, 0.0),
         "standard": (150.0, 30.0),
