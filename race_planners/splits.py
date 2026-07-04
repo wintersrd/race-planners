@@ -4,24 +4,27 @@ from typing import Any
 
 from race_planners.formatting import format_clock_time, format_duration_minutes, format_pace_minutes
 from race_planners.grade import elevation_changes
+from race_planners.i18n import t
 from race_planners.models import CuratedEvent, PaceSplit, TrackPoint
 
 
-def course_overview_rows(total_distance_km: float, event: CuratedEvent) -> list[dict[str, str]]:
+def course_overview_rows(
+    total_distance_km: float, event: CuratedEvent, locale: str = "en"
+) -> list[dict[str, str]]:
     aid_mode = (
-        f"{len(event.aid_stops_km)} configured"
+        t("overview.aid_configured", locale, count=len(event.aid_stops_km))
         if event.aid_stops_km
-        else "Derived from course file"
+        else t("overview.aid_derived", locale)
     )
     return [
-        {"label": "Distance", "value": f"{total_distance_km:.2f} km"},
-        {"label": "Terrain", "value": event.terrain.title()},
-        {"label": "Aid Stations", "value": aid_mode},
+        {"label": t("overview.distance", locale), "value": f"{total_distance_km:.2f} km"},
+        {"label": t("overview.terrain", locale), "value": event.terrain.title()},
+        {"label": t("overview.aid_stations", locale), "value": aid_mode},
         {
-            "label": "Start Time",
+            "label": t("overview.start_time", locale),
             "value": format_clock_time(event, 0.0)
             if event.start_time_local is not None
-            else "Unknown",
+            else t("overview.unknown", locale),
         },
     ]
 
@@ -81,6 +84,7 @@ def aggregate_split_rows(
     trackpoints: list[TrackPoint],
     event: CuratedEvent,
     block_size_km: int,
+    locale: str = "en",
 ) -> list[dict[str, Any]]:
     if not splits:
         return []
@@ -117,16 +121,16 @@ def aggregate_split_rows(
         )
         rows.append(
             {
-                "split": f"{block_start_km:.1f}-{block_end_km:.1f} km",
-                "distance_km": round(block_distance_km, 2),
-                "pace": format_pace_minutes(block_time_min / block_distance_km),
-                "grade": round(weighted_grade / block_distance_km, 2),
-                "elev_gain_m": round(elev_gain_m, 1),
-                "elev_loss_m": round(elev_loss_m, 1),
-                "split_time": format_duration_minutes(block_time_min),
-                "elapsed": format_duration_minutes(end_elapsed_min),
-                "clock": format_clock_time(event, end_elapsed_min),
-                "start_elapsed": format_duration_minutes(start_elapsed_min),
+                t("col.split_range", locale): f"{block_start_km:.1f}-{block_end_km:.1f} km",
+                t("col.distance_km_short", locale): round(block_distance_km, 2),
+                t("col.pace", locale): format_pace_minutes(block_time_min / block_distance_km),
+                t("col.grade", locale): round(weighted_grade / block_distance_km, 2),
+                t("col.elev_gain_m", locale): round(elev_gain_m, 1),
+                t("col.elev_loss_m", locale): round(elev_loss_m, 1),
+                t("col.split_time", locale): format_duration_minutes(block_time_min),
+                t("col.elapsed", locale): format_duration_minutes(end_elapsed_min),
+                t("col.clock", locale): format_clock_time(event, end_elapsed_min),
+                t("col.start_elapsed_short", locale): format_duration_minutes(start_elapsed_min),
             }
         )
         block_start_km = block_end_km

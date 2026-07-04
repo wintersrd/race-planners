@@ -2,6 +2,7 @@ from pathlib import Path
 
 from race_planners.event_catalog import get_curated_event
 from race_planners.formatting import format_clock_time, format_duration_minutes, format_pace_minutes
+from race_planners.i18n import t
 from race_planners.models import AthleteProfile, PacingConfig, PaceSplit, TrackPoint
 from race_planners.plan_io import export_plan_json, load_plan_into_state
 from race_planners.profile import (
@@ -211,10 +212,10 @@ def testaggregate_split_rows_supports_multi_kilometer_blocks(tmp_path: Path) -> 
     )
 
     assert len(rows) == 2
-    assert rows[0]["split"] == "0.0-2.0 km"
-    assert rows[0]["pace"] == "6:00"
-    assert rows[0]["elev_gain_m"] == 25.0
-    assert rows[1]["split"] == "2.0-3.0 km"
+    assert rows[0][t("col.split_range")] == "0.0-2.0 km"
+    assert rows[0][t("col.pace")] == "6:00"
+    assert rows[0][t("col.elev_gain_m")] == 25.0
+    assert rows[1][t("col.split_range")] == "2.0-3.0 km"
 
 
 def test_default_config_for_trail_event_uses_athlete_profile_defaults(tmp_path: Path) -> None:
