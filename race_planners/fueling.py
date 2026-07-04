@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import math
-
 from race_planners.models import (
     FuelingBlock,
     FuelingPlan,
@@ -83,14 +81,45 @@ def _aid_station_tier_on_site(tier: str) -> tuple[float, float]:
     return tier_defaults.get(tier, tier_defaults["standard"])
 
 
-def _carry_items_for_block(carb_target_g: float, gut_tolerance_g_hr: float | None) -> list[str]:
+GEL_SIZES_G: tuple[float, ...] = (30.0, 50.0)
+
+
+def _carry_items_for_block(
+    carb_target_g: float, gut_tolerance_g_hr: float | None
+) -> tuple[list[str], float]:
+    """Return (item descriptions, actual carb grams) for realistic gel sizes."""
     if carb_target_g <= 0:
-        return []
-    gels_needed = max(1, int(math.ceil(carb_target_g / 23.0)))
+        return [], 0.0
+
+    best_count = 99
+    best_overshoot = float("inf")
+    best_combo: tuple[int, int] = (0, 0)
+
+    for n_30 in range(6):
+        for n_50 in range(6):
+            count = n_30 + n_50
+            if count == 0 or count > 8:
+                continue
+            provided = n_30 * GEL_SIZES_G[0] + n_50 * GEL_SIZES_G[1]
+            if provided < carb_target_g:
+                continue
+            overshoot = provided - carb_target_g
+            if count < best_count or (count == best_count and overshoot < best_overshoot):
+                best_count = count
+                best_overshoot = overshoot
+                best_combo = (n_30, n_50)
+
+    if best_combo == (0, 0):
+        best_combo = (1, 0)
+
+    n_30, n_50 = best_combo
     items: list[str] = []
-    for i in range(min(gels_needed, 8)):
-        items.append(f"Gel {i + 1} (~23g carbs)")
-    return items
+    if n_30 > 0:
+        items.append(f"{n_30}x 30g gel" if n_30 > 1 else "1x 30g gel")
+    if n_50 > 0:
+        items.append(f"{n_50}x 50g gel" if n_50 > 1 else "1x 50g gel")
+    actual_carb = n_30 * GEL_SIZES_G[0] + n_50 * GEL_SIZES_G[1]
+    return items, actual_carb
 
 
 def build_fueling_plan(
@@ -148,24 +177,24 @@ def build_fueling_plan(
         block_carb_target = effective_carb_target * block_duration_hr
         block_fluid_target = sweat_rate * block_duration_hr
 
-        tier = "standard"
+        tier = "none"
         on_site_kcal = 0.0
         on_site_carb = 0.0
         if block_index < len(aid_etas):
             aid_tier_index = block_index
             if aid_tier_index < len(aid_station_tiers):
                 tier = aid_station_tiers[aid_tier_index]
+            else:
+                tier = "standard"
             on_site_kcal, on_site_carb = _aid_station_tier_on_site(tier)
 
-        moving_carb = min(block_carb_target, effective_carb_target * block_duration_hr)
-        carb_planned = moving_carb + on_site_carb
+        carry_items, carry_carb = _carry_items_for_block(
+            max(block_carb_target - on_site_carb, 0.0), gut_carb_tolerance_g_hr
+        )
+        carb_planned = carry_carb + on_site_carb
 
         cumulative_carb_target += block_carb_target
         cumulative_carb_planned += carb_planned
-
-        carry_items = _carry_items_for_block(
-            max(block_carb_target - on_site_carb, 0.0), gut_carb_tolerance_g_hr
-        )
 
         blocks.append(
             FuelingBlock(

@@ -154,3 +154,27 @@ def test_fueling_plan_warns_on_large_carb_deficit() -> None:
 
     assert len(fueling.warnings) > 0
     assert any("gut stress" in w.lower() for w in fueling.warnings)
+
+
+def test_carry_items_use_realistic_gel_sizes() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    loaded = load_course_trackpoints(course)
+    config = PacingConfig(
+        race_model="half_marathon",
+        input_mode="finish_time",
+        target_finish_time_min=92.0,
+    )
+    plan_result = calculate_plan(loaded, config)
+
+    fueling = build_fueling_plan(plan_result, 70.0, 16.0, ["water_only", "water_only", "standard"])
+
+    for block in fueling.blocks:
+        for item in block.carry_items:
+            assert "30g gel" in item or "50g gel" in item
+            assert "23g" not in item
+
+        if block.carry_items:
+            carry_carb = block.carb_planned_g - block.on_site_carb_g
+            assert carry_carb >= block.carb_target_g - block.on_site_carb_g
+            assert carry_carb in {30.0, 50.0, 60.0, 80.0, 90.0, 100.0, 110.0, 120.0, 150.0}
