@@ -187,6 +187,9 @@ def test_time_format_helpers_render_human_readable_values(tmp_path: Path) -> Non
     assert format_duration_minutes(88.5) == "1:28:30"
     assert format_duration_minutes(4.5) == "4:30"
     assert format_clock_time(event, 88.5) == "7:58 AM"
+    assert format_clock_time(event, 88.5, "fr") == "7:58"
+    assert format_clock_time(event, 0.0, "fr") == "6:30"
+    assert format_clock_time(event, 0.0, "en") == "6:30 AM"
 
 
 def testaggregate_split_rows_supports_multi_kilometer_blocks(tmp_path: Path) -> None:

@@ -849,7 +849,7 @@ def render_general_planner(repo_root: Path) -> None:
                         {
                             t("label.metric", locale): t("summary.estimated_finish", locale),
                             t("label.value", locale): format_clock_time(
-                                selected_event, result.total_time_min
+                                selected_event, result.total_time_min, locale
                             ),
                         },
                     ]
@@ -877,6 +877,7 @@ def render_general_planner(repo_root: Path) -> None:
                             t("col.arrival_clock", locale): format_clock_time(
                                 selected_event,
                                 aid_eta.arrival_elapsed_time_min,
+                                locale,
                             ),
                             t("col.departure_elapsed", locale): format_duration_minutes(
                                 aid_eta.departure_elapsed_time_min
@@ -884,6 +885,7 @@ def render_general_planner(repo_root: Path) -> None:
                             t("col.departure_clock", locale): format_clock_time(
                                 selected_event,
                                 aid_eta.departure_elapsed_time_min,
+                                locale,
                             ),
                             t("col.split_time", locale): format_duration_minutes(
                                 aid_eta.split_from_prev_min
@@ -922,10 +924,10 @@ def render_general_planner(repo_root: Path) -> None:
                         ),
                         t("col.end_elapsed", locale): format_duration_minutes(segment.end_time_min),
                         t("col.start_clock", locale): format_clock_time(
-                            selected_event, segment.start_time_min
+                            selected_event, segment.start_time_min, locale
                         ),
                         t("col.end_clock", locale): format_clock_time(
-                            selected_event, segment.end_time_min
+                            selected_event, segment.end_time_min, locale
                         ),
                         t("col.avg_grade", locale): round(segment.avg_grade_percent, 2),
                         t("col.avg_pace", locale): format_pace_minutes(segment.avg_pace_min_km),

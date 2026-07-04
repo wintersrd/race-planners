@@ -22,7 +22,7 @@ def course_overview_rows(
         {"label": t("overview.aid_stations", locale), "value": aid_mode},
         {
             "label": t("overview.start_time", locale),
-            "value": format_clock_time(event, 0.0)
+            "value": format_clock_time(event, 0.0, locale)
             if event.start_time_local is not None
             else t("overview.unknown", locale),
         },
@@ -129,7 +129,7 @@ def aggregate_split_rows(
                 t("col.elev_loss_m", locale): round(elev_loss_m, 1),
                 t("col.split_time", locale): format_duration_minutes(block_time_min),
                 t("col.elapsed", locale): format_duration_minutes(end_elapsed_min),
-                t("col.clock", locale): format_clock_time(event, end_elapsed_min),
+                t("col.clock", locale): format_clock_time(event, end_elapsed_min, locale),
                 t("col.start_elapsed_short", locale): format_duration_minutes(start_elapsed_min),
             }
         )

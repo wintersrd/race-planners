@@ -30,13 +30,19 @@ def start_datetime(event: CuratedEvent) -> datetime | None:
     return datetime.strptime(event.start_time_local, "%H:%M")
 
 
-def format_clock_time(event: CuratedEvent, elapsed_minutes: float | None) -> str:
+def format_clock_time(
+    event: CuratedEvent, elapsed_minutes: float | None, locale: str = "en"
+) -> str:
     if elapsed_minutes is None:
         return "-"
     start_dt = start_datetime(event)
     if start_dt is None:
         return "-"
     clock_dt = start_dt + timedelta(minutes=elapsed_minutes)
+
+    if locale == "fr":
+        return f"{clock_dt.hour}:{clock_dt.minute:02d}"
+
     hour_12 = clock_dt.hour % 12 or 12
     suffix = "AM" if clock_dt.hour < 12 else "PM"
     return f"{hour_12}:{clock_dt.minute:02d} {suffix}"
