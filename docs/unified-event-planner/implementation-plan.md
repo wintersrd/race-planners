@@ -143,6 +143,16 @@ Status: In progress
     added
   - added regression coverage proving the expanded athlete profile survives plan
     JSON restoration and that the new schema fields round-trip correctly
+- Road/athlete Phase 2 completed:
+  - added explicit road capability-source helpers for manual profile values,
+    predictor values, and LT-derived modeled values with clear precedence rules
+  - updated road event defaults to seed target finish time from the selected
+    capability source instead of fixed static placeholder times when profile data
+    is available
+  - surfaced a user-facing road capability comparison table in the planner so the
+    selected source is visible instead of silently implied
+  - added regression coverage for capability-source precedence, modeled road
+    best-likely heuristics, and road default seeding from the chosen source
 
 ## Objective
 

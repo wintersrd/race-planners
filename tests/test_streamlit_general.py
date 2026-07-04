@@ -11,6 +11,9 @@ from race_planners.streamlit_general import (
     _format_clock_time,
     _format_duration_minutes,
     _format_pace_minutes,
+    _modeled_road_best_likely_time_min,
+    _road_capability_sources,
+    _selected_road_capability,
     load_plan_into_state,
 )
 
@@ -262,6 +265,83 @@ def test_default_config_for_road_event_uses_profile_split_bias(tmp_path: Path) -
 
     assert config["marathon_pace_min_km"] == 4.78
     assert config["pacing_bias"] == -2.5
+
+
+def test_selected_road_capability_prefers_manual_then_predictor_then_model() -> None:
+    profile = {
+        "best_likely_marathon_time_min": 205.0,
+        "predictor_marathon_time_min": 210.0,
+        "predictor_source": "COROS",
+        "lt1_pace_min_km": 5.0,
+    }
+
+    selected_time_min, selected_source = _selected_road_capability(profile, "road_marathon")
+
+    assert selected_time_min == 205.0
+    assert selected_source == "Manual Profile"
+
+    del profile["best_likely_marathon_time_min"]
+    selected_time_min, selected_source = _selected_road_capability(profile, "road_marathon")
+
+    assert selected_time_min == 210.0
+    assert selected_source == "COROS"
+
+    del profile["predictor_marathon_time_min"]
+    selected_time_min, selected_source = _selected_road_capability(profile, "road_marathon")
+
+    assert selected_time_min is not None
+    assert selected_source == "LT-Derived Model"
+
+
+def test_modeled_road_best_likely_time_uses_current_profile_heuristic() -> None:
+    profile = {
+        "lt1_pace_min_km": 5.0,
+        "lt2_pace_min_km": 4.25,
+    }
+
+    half_time_min = _modeled_road_best_likely_time_min(profile, "half_marathon")
+    marathon_time_min = _modeled_road_best_likely_time_min(profile, "road_marathon")
+
+    assert half_time_min == 100.85
+    assert marathon_time_min == 210.97
+
+
+def test_road_capability_sources_marks_selected_source() -> None:
+    sources = _road_capability_sources(
+        {
+            "predictor_half_time_min": 92.0,
+            "predictor_source": "Strava",
+            "lt1_pace_min_km": 5.0,
+            "lt2_pace_min_km": 4.25,
+        },
+        "half_marathon",
+    )
+
+    assert [row["source"] for row in sources] == [
+        "Manual Profile",
+        "Strava",
+        "LT-Derived Model",
+    ]
+    assert sources[1]["selected"] is True
+    assert sources[2]["selected"] is False
+
+
+def test_default_config_for_road_event_uses_selected_capability_time(tmp_path: Path) -> None:
+    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
+    (tmp_path / "semi-marathon-finistere" / "marathon-des-etoiles-de-la-baie.gpx").write_text(
+        "<gpx></gpx>", encoding="utf-8"
+    )
+    event = get_curated_event(tmp_path, "marathon-etoiles-baie")
+
+    config = _default_config_for_event(
+        event,
+        {
+            "best_likely_marathon_time_min": 198.0,
+            "lt1_pace_min_km": 5.0,
+        },
+    )
+
+    assert config["target_finish_time_min"] == 198.0
 
 
 def test_derived_hr_guardrail_cap_uses_profile_and_policy() -> None:

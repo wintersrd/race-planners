@@ -293,6 +293,71 @@ def _road_anchor_default_from_profile(
     return round(lt1, 2)
 
 
+def _road_race_distance_km(race_model: str) -> float | None:
+    distance_map = {
+        "half_marathon": 21.0975,
+        "road_marathon": 42.195,
+    }
+    return distance_map.get(race_model)
+
+
+def _modeled_road_best_likely_time_min(
+    athlete_profile: dict[str, Any], race_model: str
+) -> float | None:
+    anchor_pace_min_km = _road_anchor_default_from_profile(athlete_profile, race_model)
+    race_distance_km = _road_race_distance_km(race_model)
+    if anchor_pace_min_km is None or race_distance_km is None:
+        return None
+    return round(anchor_pace_min_km * race_distance_km, 2)
+
+
+def _road_capability_sources(
+    athlete_profile: dict[str, Any], race_model: str
+) -> list[dict[str, Any]]:
+    profile_key = (
+        "best_likely_half_time_min"
+        if race_model == "half_marathon"
+        else "best_likely_marathon_time_min"
+    )
+    predictor_key = (
+        "predictor_half_time_min"
+        if race_model == "half_marathon"
+        else "predictor_marathon_time_min"
+    )
+    predictor_source = athlete_profile.get("predictor_source") or "Predictor"
+    modeled_time_min = _modeled_road_best_likely_time_min(athlete_profile, race_model)
+
+    return [
+        {
+            "source": "Manual Profile",
+            "time_min": athlete_profile.get(profile_key),
+            "selected": athlete_profile.get(profile_key) is not None,
+        },
+        {
+            "source": str(predictor_source),
+            "time_min": athlete_profile.get(predictor_key),
+            "selected": athlete_profile.get(profile_key) is None
+            and athlete_profile.get(predictor_key) is not None,
+        },
+        {
+            "source": "LT-Derived Model",
+            "time_min": modeled_time_min,
+            "selected": athlete_profile.get(profile_key) is None
+            and athlete_profile.get(predictor_key) is None
+            and modeled_time_min is not None,
+        },
+    ]
+
+
+def _selected_road_capability(
+    athlete_profile: dict[str, Any], race_model: str
+) -> tuple[float | None, str | None]:
+    for source in _road_capability_sources(athlete_profile, race_model):
+        if source["selected"] and source["time_min"] is not None:
+            return float(source["time_min"]), str(source["source"])
+    return None, None
+
+
 def _derived_effort_policy(profile: dict[str, Any]) -> str:
     return str(profile.get("default_trail_effort_policy") or "steady")
 
@@ -400,7 +465,10 @@ def _default_config_for_event(
     config["peak_temperature_c"] = event.baseline_peak_temp_c or 18.0
 
     if event.race_model == "half_marathon":
-        config["target_finish_time_min"] = 105.0
+        selected_capability_time_min, _ = _selected_road_capability(
+            athlete_profile, event.race_model
+        )
+        config["target_finish_time_min"] = selected_capability_time_min or 105.0
         config["rest_duration_sec"] = 10
         config["marathon_pace_min_km"] = _road_anchor_default_from_profile(
             athlete_profile,
@@ -408,7 +476,10 @@ def _default_config_for_event(
         )
         config["pacing_bias"] = _derived_split_bias(athlete_profile)
     elif event.race_model == "road_marathon":
-        config["target_finish_time_min"] = 240.0
+        selected_capability_time_min, _ = _selected_road_capability(
+            athlete_profile, event.race_model
+        )
+        config["target_finish_time_min"] = selected_capability_time_min or 240.0
         config["rest_duration_sec"] = 15
         config["marathon_pace_min_km"] = _road_anchor_default_from_profile(
             athlete_profile,
@@ -956,6 +1027,37 @@ def render_general_planner(repo_root: Path) -> None:
             st.caption(
                 "Aid points: "
                 + ", ".join(f"{aid.distance_km:.1f} km" for aid in selected_course.aid_stations)
+            )
+
+    if _is_road_event(selected_event):
+        capability_rows = _road_capability_sources(athlete_profile, race_model)
+        selected_capability_time_min, selected_capability_source = _selected_road_capability(
+            athlete_profile,
+            race_model,
+        )
+        st.markdown("### Road Capability")
+        st.caption(
+            "Best-likely road capability uses manual profile values first, then predictor values, then LT-derived estimates."
+        )
+        st.dataframe(
+            pd.DataFrame(
+                [
+                    {
+                        "Source": row["source"],
+                        "Best Likely": _format_duration_minutes(
+                            float(row["time_min"]) if row["time_min"] is not None else None
+                        ),
+                        "Selected": "Yes" if row["selected"] else "",
+                    }
+                    for row in capability_rows
+                ]
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+        if selected_capability_time_min is not None and selected_capability_source is not None:
+            st.caption(
+                f"Selected capability source: {selected_capability_source} ({_format_duration_minutes(selected_capability_time_min)})"
             )
 
     new_config = PacingConfig(
