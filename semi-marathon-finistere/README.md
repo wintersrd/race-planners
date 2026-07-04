@@ -40,14 +40,15 @@ Two versions are available:
 
 ### Features
 
-- Bilingual interface (English/French toggle)
-- Target finish time OR target pace input
-- Power fade adjustment for negative/positive splits
-- Rest stop timing and strategy
-- Course-specific pacing tips for each section
-- Printable pocket card and wristband reference
-- Elevation profile visualization
-- Per-kilometer pace breakdown
+- **Bilingual interface** (English/French toggle in the sidebar)
+- Curated event-first selection across road and trail events
+- Road events: race intent, split bias, aid stop timing
+- Trail/ultra events: climb-to-hike threshold, descent caution, fade profiles, effort policy
+- Athlete profile with LT1/LT2 baselines, road capability, trail adjustments, and universal factors
+- Weather-driven heat penalty with diurnal temperature modeling
+- Fueling and nutrition plan with per-block calorie, carb, and fluid targets
+- Per-kilometer and aggregated split pacing with elevation gain/loss
+- JSON plan and athlete profile export/import
 
 ### Unified Planner Highlights
 
