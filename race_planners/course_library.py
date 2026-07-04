@@ -13,7 +13,9 @@ def get_builtin_courses(repo_root: Path) -> list[Course]:
     courses: list[Course] = []
     for event in list_curated_events(repo_root):
         gpx_path = repo_root / event.gpx_relative_path
-        aid_stations = _aid_stations_for_event(gpx_path, event.aid_stops_km)
+        aid_stations = _aid_stations_for_event(
+            gpx_path, event.aid_stops_km, event.aid_station_tiers
+        )
         courses.append(
             Course(
                 course_id=event.course_id,
@@ -88,11 +90,39 @@ def save_uploaded_gpx(
     return _course_from_gpx(target, namespace="upload")
 
 
-def _aid_stations_for_event(gpx_path: Path, aid_stop_overrides_km: list[float]) -> list[AidStation]:
+def _aid_stations_for_event(
+    gpx_path: Path,
+    aid_stop_overrides_km: list[float],
+    aid_station_tiers: dict[float, str] | None = None,
+) -> list[AidStation]:
+    aid_station_tiers = aid_station_tiers or {}
     if aid_stop_overrides_km:
         return [
-            AidStation(distance_km=distance_km, source="config_override")
+            AidStation(
+                distance_km=distance_km,
+                source="config_override",
+                tier=_tier_for_distance(distance_km, aid_station_tiers),
+            )
             for distance_km in aid_stop_overrides_km
             if distance_km > 0
         ]
-    return extract_aid_stations(str(gpx_path))
+    stations = extract_aid_stations(str(gpx_path))
+    if aid_station_tiers:
+        return [
+            AidStation(
+                distance_km=station.distance_km,
+                label=station.label,
+                source=station.source,
+                waypoint_type=station.waypoint_type,
+                tier=_tier_for_distance(station.distance_km, aid_station_tiers),
+            )
+            for station in stations
+        ]
+    return stations
+
+
+def _tier_for_distance(distance_km: float, tiers: dict[float, str]) -> str:
+    for configured_km, tier in tiers.items():
+        if abs(distance_km - configured_km) < 0.1:
+            return tier
+    return "standard"

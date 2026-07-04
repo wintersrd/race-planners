@@ -20,6 +20,7 @@ class AidStation:
     label: str = ""
     source: str = "config"
     waypoint_type: str = ""
+    tier: str = "standard"
 
 
 @dataclass
@@ -67,6 +68,7 @@ class CuratedEvent:
     race_model: str
     terrain: str
     aid_stops_km: list[float] = field(default_factory=list)
+    aid_station_tiers: dict[float, str] = field(default_factory=dict)
     default_input_mode: str = "finish_time"
     start_time_local: str | None = None
     baseline_peak_temp_c: float | None = None
@@ -91,6 +93,9 @@ class AthleteProfile:
     default_road_split_bias: float | None = None
     default_trail_fade_preset: str | None = None
     default_trail_effort_policy: str | None = None
+    body_mass_kg: float | None = None
+    sweat_rate_l_hr: float | None = None
+    gut_carb_tolerance_g_hr: float | None = None
 
 
 @dataclass
@@ -181,4 +186,33 @@ class PlanResult:
     total_time_min: float
     total_distance_km: float
     assumptions: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass
+class FuelingBlock:
+    start_km: float
+    end_km: float
+    distance_km: float
+    duration_min: float
+    kcal_burned: float
+    carb_target_g: float
+    carb_planned_g: float
+    fluid_target_l: float
+    carry_items: list[str] = field(default_factory=list)
+    aid_station_tier: str = "standard"
+    on_site_kcal: float = 0.0
+    on_site_carb_g: float = 0.0
+    cumulative_carb_deficit_g: float = 0.0
+
+
+@dataclass
+class FuelingPlan:
+    total_kcal: float
+    avg_kcal_hr: float
+    total_carb_target_g: float
+    total_carb_planned_g: float
+    total_fluid_target_l: float
+    blocks: list[FuelingBlock]
+    carb_deficit_g: float
     warnings: list[str] = field(default_factory=list)

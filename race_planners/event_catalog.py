@@ -62,6 +62,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             race_model="half_marathon",
             terrain="road",
             aid_stops_km=[5.3, 9.1, 14.5],
+            aid_station_tiers={5.3: "water_only", 9.1: "water_only"},
             baseline_peak_temp_c=16.0,
         ),
         CuratedEvent(

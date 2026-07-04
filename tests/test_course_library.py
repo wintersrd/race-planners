@@ -57,6 +57,9 @@ def test_get_builtin_courses_uses_curated_event_catalog(tmp_path: Path) -> None:
     assert finistere.event_id == "semi-marathon-finistere"
     assert finistere.template_id == "road_half"
     assert finistere.aid_stations[0].source == "config_override"
+    assert finistere.aid_stations[0].tier == "water_only"
+    assert finistere.aid_stations[1].tier == "water_only"
+    assert finistere.aid_stations[2].tier == "standard"
     assert len(grf56.aid_stops_km) == 1
     assert grf56.aid_stations[0].source == "gpx_waypoint"
 

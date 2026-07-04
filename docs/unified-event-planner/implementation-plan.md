@@ -202,6 +202,11 @@ Status: In progress
     planning
   - browser-validated the road event flow to confirm the explanation appears in
     the live unified planner next to the capability and intent controls
+- Fueling and nutrition execution plan added:
+  - documented the next implementation sequence for aid-station tier modeling,
+    energy expenditure, carbohydrate and hydration demand, moving fuel
+    schedules, and per-station fueling guidance differentiated by aid station
+    capability
 
 ## Objective
 

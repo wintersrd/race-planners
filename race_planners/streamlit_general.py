@@ -957,6 +957,27 @@ def render_general_planner(repo_root: Path) -> None:
             st.caption(
                 "These factors influence both road and trail events. Positive values help you resist that cost; negative values amplify it."
             )
+            athlete_profile["body_mass_kg"] = _parse_optional_number(
+                st.text_input(
+                    "Body Mass (kg)",
+                    _profile_text(athlete_profile, "body_mass_kg"),
+                    help="Used for calorie and fueling calculations.",
+                )
+            )
+            athlete_profile["sweat_rate_l_hr"] = _parse_optional_number(
+                st.text_input(
+                    "Sweat Rate (L/hr)",
+                    _profile_text(athlete_profile, "sweat_rate_l_hr"),
+                    help="Optional. If blank, the planner estimates from temperature and intensity.",
+                )
+            )
+            athlete_profile["gut_carb_tolerance_g_hr"] = _parse_optional_number(
+                st.text_input(
+                    "Gut Carb Tolerance (g/hr)",
+                    _profile_text(athlete_profile, "gut_carb_tolerance_g_hr"),
+                    help="Optional. Maximum carbs you can absorb per hour. If blank, planner uses event-duration defaults.",
+                )
+            )
             athlete_profile["durability_factor"] = st.slider(
                 "Durability Factor",
                 min_value=-1.0,
