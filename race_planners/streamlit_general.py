@@ -256,6 +256,7 @@ def render_general_planner(repo_root: Path) -> None:
     rest_duration_water_only_sec = int(cfg.get("rest_duration_water_only_sec", 240))
     rest_duration_standard_sec = int(cfg.get("rest_duration_standard_sec", 480))
     rest_duration_full_service_sec = int(cfg.get("rest_duration_full_service_sec", 720))
+    carried_weight_kg = float(cfg.get("carried_weight_kg", 3.0))
 
     with st.sidebar:
         locale_options = list(AVAILABLE_LOCALES)
@@ -761,6 +762,14 @@ def render_general_planner(repo_root: Path) -> None:
                         help=t("control.use_hr_guardrail.help", locale),
                     )
                     st.caption(t("caption.derived_hr_cap", locale, hr=derived_hr_cap))
+                carried_weight_kg = st.slider(
+                    t("control.carried_weight", locale),
+                    min_value=0.0,
+                    max_value=10.0,
+                    value=float(cfg.get("carried_weight_kg", 3.0)),
+                    step=0.5,
+                    help=t("control.carried_weight.help", locale),
+                )
 
         calculate_plan_clicked = st.button(
             t("button.calculate", locale), type="primary", use_container_width=True
@@ -982,6 +991,8 @@ def render_general_planner(repo_root: Path) -> None:
         peak_temperature_c=peak_temperature_c,
         event_start_time_local=selected_event.start_time_local,
         event_month=selected_event.event_month,
+        carried_weight_kg=0.0 if is_road_event(selected_event) else carried_weight_kg,
+        athlete_body_mass_kg=athlete_profile.get("body_mass_kg"),
     )
     st.session_state["general_config"] = asdict(new_config)
     st.session_state["general_athlete_profile"] = normalized_athlete_profile(athlete_profile)

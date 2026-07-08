@@ -147,6 +147,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "control.use_hr_guardrail": "Use Derived HR Guardrail",
         "control.use_hr_guardrail.help": "Uses your LT1/LT2 profile to temper pacing on steep or late-race trail segments.",
         "caption.derived_hr_cap": "Derived guardrail cap for this event: {hr} bpm",
+        "control.carried_weight": "Average Carried Weight (kg)",
+        "control.carried_weight.help": "Average weight of pack, water, food, and gear carried through the event. Increases metabolic cost of every kilometer.",
         # ── Calculate ────────────────────────────────────────────────
         "button.calculate": "Calculate Plan",
         # ── Course overview ──────────────────────────────────────────
@@ -537,6 +539,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "control.use_hr_guardrail": "Utiliser le Garde-fou FC Dérivé",
         "control.use_hr_guardrail.help": "Utilise votre profil LT1/LT2 pour tempérer l'allure sur les segments raides ou de fin de course.",
         "caption.derived_hr_cap": "Plafond de garde-fou dérivé pour cet événement : {hr} bpm",
+        "control.carried_weight": "Poids Moyen Transporté (kg)",
+        "control.carried_weight.help": "Poids moyen du sac, eau, nourriture et matériel transporté pendant l'événement. Augmente le coût métabolique de chaque kilomètre.",
         # ── Calculate ────────────────────────────────────────────────
         "button.calculate": "Calculer le Plan",
         # ── Course overview ──────────────────────────────────────────

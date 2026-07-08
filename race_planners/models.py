@@ -144,6 +144,8 @@ class PacingConfig:
     peak_temperature_c: float | None = None
     event_start_time_local: str | None = None
     event_month: int | None = None
+    carried_weight_kg: float = 0.0
+    athlete_body_mass_kg: float | None = None
 
 
 @dataclass

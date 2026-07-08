@@ -95,6 +95,12 @@ def _build_model(
     raise ValueError("road/half model requires marathon pace or target finish time")
 
 
+def _carried_weight_multiplier(config: PacingConfig, body_mass_kg: float | None) -> float:
+    if config.carried_weight_kg <= 0 or body_mass_kg is None or body_mass_kg <= 0:
+        return 1.0
+    return 1.0 + (config.carried_weight_kg / body_mass_kg) * 0.8
+
+
 def _rest_duration_sec_for_station(config: PacingConfig, aid_station: AidStation) -> float:
     if is_road_race_model(config.race_model):
         return float(config.rest_duration_sec)
@@ -300,6 +306,7 @@ def _simulate_total_time(
         pace_min_km *= durability_multiplier(config, context)
         pace_min_km *= trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= segment_heat_multiplier(config, cumulative_time)
+        pace_min_km *= _carried_weight_multiplier(config, config.athlete_body_mass_kg)
         cumulative_time += pace_min_km * fatigue_multiplier(race_model, context.progress_ratio)
 
     remaining = total_distance_km - full_km_count
@@ -313,6 +320,7 @@ def _simulate_total_time(
         pace_min_km *= durability_multiplier(config, context)
         pace_min_km *= trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= segment_heat_multiplier(config, cumulative_time)
+        pace_min_km *= _carried_weight_multiplier(config, config.athlete_body_mass_kg)
         cumulative_time += pace_min_km * remaining * fatigue_multiplier(race_model, 1.0)
 
     return cumulative_time
@@ -347,6 +355,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         pace_min_km *= durability_multiplier(config, context)
         pace_min_km *= trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= segment_heat_multiplier(config, cumulative_time)
+        pace_min_km *= _carried_weight_multiplier(config, config.athlete_body_mass_kg)
         pace_min_km *= fatigue_multiplier(config.race_model, progress_ratio)
         cumulative_time += pace_min_km
         splits.append(
@@ -370,6 +379,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         pace_min_km *= durability_multiplier(config, context)
         pace_min_km *= trail_hill_tolerance_multiplier(config, context)
         pace_min_km *= segment_heat_multiplier(config, cumulative_time)
+        pace_min_km *= _carried_weight_multiplier(config, config.athlete_body_mass_kg)
         pace_min_km *= fatigue_multiplier(config.race_model, 1.0)
         segment_time = pace_min_km * remaining
         cumulative_time += segment_time
