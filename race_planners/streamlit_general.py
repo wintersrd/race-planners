@@ -100,6 +100,109 @@ def _translate_source_label(source: str, locale: str) -> str:
     return t(source_key_map.get(source, source), locale)
 
 
+def _pace_band_label(
+    pace_min_km: float | None, reference_pace_min_km: float | None, locale: str
+) -> str:
+    if pace_min_km is None or reference_pace_min_km is None or reference_pace_min_km <= 0:
+        return "-"
+    ratio = pace_min_km / reference_pace_min_km
+    if ratio < 0.94:
+        return t("pace_band.fast", locale)
+    if ratio <= 1.03:
+        return t("pace_band.on_target", locale)
+    if ratio <= 1.12:
+        return t("pace_band.costly", locale)
+    return t("pace_band.high_risk", locale)
+
+
+def _road_split_story(pacing_bias: float, locale: str) -> str:
+    if pacing_bias <= -1.5:
+        return t("story.road_split.hold_back", locale)
+    if pacing_bias >= 1.5:
+        return t("story.road_split.front_load", locale)
+    return t("story.road_split.even", locale)
+
+
+def _section_cue(segment_type: str, locale: str) -> str:
+    return t(f"section.cue.{segment_type}", locale)
+
+
+def _aid_station_action(tier: str, locale: str) -> str:
+    return t(f"aid.action.{tier}", locale)
+
+
+def _fueling_block_action(block: Any, locale: str) -> tuple[str, str, str]:
+    carry = "; ".join(block.carry_items) if block.carry_items else t("fueling.action.none", locale)
+    station = _aid_tier_label(block.aid_station_tier, locale)
+    fluid = f"{block.fluid_target_l:.1f}L"
+    return carry, station, fluid
+
+
+def _split_pace_display_to_minutes(pace_display: str) -> float | None:
+    parts = pace_display.split(":")
+    if len(parts) != 2:
+        return None
+    try:
+        mins = int(parts[0])
+        secs = int(parts[1])
+    except ValueError:
+        return None
+    return mins + secs / 60.0
+
+
+def _road_story_lines(
+    locale: str,
+    race_intent: str,
+    pacing_bias: float,
+    adjusted_best_likely_time_min: float | None,
+    chosen_target_time_min: float | None,
+) -> list[str]:
+    lines = [
+        t("story.road_intro", locale, intent=t(f"preset.intent.{race_intent}", locale).lower())
+    ]
+    if adjusted_best_likely_time_min is not None and chosen_target_time_min is not None:
+        feasibility = classify_road_feasibility(
+            adjusted_best_likely_time_min, chosen_target_time_min
+        )
+        lines.append(t("story.road_target", locale, feasibility=t(feasibility, locale).lower()))
+    lines.append(_road_split_story(pacing_bias, locale))
+    return lines
+
+
+def _trail_story_lines(
+    locale: str,
+    fade_profile_preset: str | None,
+    descent_caution: str,
+    peak_temperature_c: float | None,
+    sections: list[Any],
+) -> list[str]:
+    fade_label = t(f"preset.fade.{fade_profile_preset or 'stable'}", locale).lower()
+    descent_label = t(f"desc.{descent_caution}", locale)
+    lines = [t("story.trail_intro", locale, fade=fade_label, descent=descent_label)]
+    if peak_temperature_c is not None and peak_temperature_c >= 24:
+        lines.append(t("story.trail_heat", locale))
+
+    costly_sections = sorted(sections, key=lambda segment: segment.segment_time_min, reverse=True)
+    if len(costly_sections) >= 2:
+        lines.append(
+            t(
+                "story.trail_sections",
+                locale,
+                section_one=costly_sections[0].block_label or costly_sections[0].section_name,
+                section_two=costly_sections[1].block_label or costly_sections[1].section_name,
+            )
+        )
+    elif len(costly_sections) == 1:
+        lines.append(
+            t(
+                "story.trail_sections.single",
+                locale,
+                section_one=costly_sections[0].block_label or costly_sections[0].section_name,
+            )
+        )
+    return lines
+
+
 def render_general_planner(repo_root: Path) -> None:
     st.session_state.setdefault("general_locale", DEFAULT_LOCALE)
     locale = st.session_state["general_locale"]
@@ -855,24 +958,101 @@ def render_general_planner(repo_root: Path) -> None:
         result = st.session_state["general_result"]
         chosen_course = st.session_state["general_selected_course"]
         loaded_course = st.session_state.get("general_loaded_course", overview_course)
+        is_road_result = is_road_event(selected_event)
         st.subheader(t("section.plan_output", locale))
         average_pace_min_km = (
             result.moving_time_min / result.total_distance_km
             if result.total_distance_km > 0
             else None
         )
-        summary_a, summary_b, summary_c, summary_d, summary_e = st.columns(5)
-        summary_a.metric(t("metric.distance", locale), f"{result.total_distance_km:.2f} km")
-        summary_b.metric(
-            t("metric.elapsed", locale), format_duration_minutes(result.total_time_min)
+        body_mass_kg = athlete_profile.get("body_mass_kg")
+        fueling_plan = None
+        if body_mass_kg is not None:
+            fueling_plan = build_fueling_plan(
+                result,
+                mass_kg=float(body_mass_kg),
+                peak_temperature_c=peak_temperature_c,
+                aid_station_tiers=[station.tier for station in selected_course.aid_stations],
+                athlete_sweat_rate=athlete_profile.get("sweat_rate_l_hr"),
+                gut_carb_tolerance_g_hr=athlete_profile.get("gut_carb_tolerance_g_hr"),
+            )
+
+        adjusted_capability = None
+        chosen_target_time_min: float | None = None
+        if is_road_result:
+            selected_capability_time_min, _ = selected_road_capability(athlete_profile, race_model)
+            if selected_capability_time_min is not None:
+                adjusted_capability = estimate_road_adjusted_best_likely(
+                    overview_course,
+                    selected_capability_time_min,
+                    peak_temperature_c=peak_temperature_c,
+                    start_time_local=selected_event.start_time_local,
+                    hill_tolerance=athlete_profile.get("hill_tolerance"),
+                    heat_tolerance=athlete_profile.get("heat_tolerance"),
+                )
+            race_distance_km = road_race_distance_km(race_model)
+            if input_mode == "finish_time":
+                chosen_target_time_min = target_finish_time_min
+            elif marathon_pace_min_km is not None and race_distance_km is not None:
+                chosen_target_time_min = marathon_pace_min_km * race_distance_km
+
+        story_lines = (
+            _road_story_lines(
+                locale,
+                race_intent,
+                pacing_bias,
+                adjusted_capability["adjusted_time_min"]
+                if adjusted_capability is not None
+                else None,
+                chosen_target_time_min,
+            )
+            if is_road_result
+            else _trail_story_lines(
+                locale,
+                fade_profile_preset,
+                descent_caution,
+                peak_temperature_c,
+                result.segments,
+            )
         )
-        summary_c.metric(
-            t("metric.moving", locale), format_duration_minutes(result.moving_time_min)
+
+        hero_a, hero_b, hero_c, hero_d, hero_e = st.columns(5)
+        hero_a.metric(
+            t("metric.finish_estimate", locale),
+            format_duration_minutes(result.total_time_min),
         )
-        summary_d.metric(
-            t("metric.rest", locale), format_duration_minutes(result.total_rest_time_min)
+        hero_b.metric(t("metric.moving", locale), format_duration_minutes(result.moving_time_min))
+        hero_c.metric(t("metric.avg_pace", locale), format_pace_minutes(average_pace_min_km))
+        hero_d.metric(
+            t("summary.elev_gain", locale),
+            f"+{total_gain_m:.0f}m / -{total_loss_m:.0f}m",
         )
-        summary_e.metric(t("metric.avg_pace", locale), format_pace_minutes(average_pace_min_km))
+        hero_e.metric(
+            t("metric.fueling_target", locale),
+            (
+                f"{fueling_plan.total_carb_target_g:.0f}g / {fueling_plan.total_fluid_target_l:.1f}L"
+                if fueling_plan is not None
+                else "-"
+            ),
+        )
+
+        st.markdown(t("section.what_plan_means", locale))
+        for story_line in story_lines:
+            st.markdown(f"- {story_line}")
+
+        st.markdown(t("section.race_story", locale))
+        st.pyplot(
+            plot_course_profile(loaded_course.trackpoints, chosen_course.aid_stops_km, locale)
+        )
+        story_left, story_right = st.columns(2)
+        with story_left:
+            st.pyplot(plot_cumulative_time(result, selected_event, locale))
+        with story_right:
+            if is_road_result:
+                st.pyplot(plot_half_comparison(result, locale))
+            else:
+                st.pyplot(plot_terrain_breakdown(result, locale))
+
         if result.assumptions:
             translated = [_translate_message(a, locale) for a in result.assumptions]
             st.caption(t("caption.assumptions", locale, assumptions=" | ".join(translated)))
@@ -880,21 +1060,30 @@ def render_general_planner(repo_root: Path) -> None:
             for warning in result.warnings:
                 st.warning(_translate_message(warning, locale))
 
-        tab_summary, tab_profile, tab_aid, tab_sections, tab_fueling, tab_splits, tab_analysis = (
-            st.tabs(
+        if is_road_result:
+            tab_aid, tab_splits, tab_fueling, tab_sections, tab_diagnostics, tab_snapshot = st.tabs(
                 [
-                    t("tab.summary", locale),
-                    t("tab.course_profile", locale),
+                    t("tab.aid_stations", locale),
+                    t("tab.splits", locale),
+                    t("tab.fueling", locale),
+                    t("tab.sections", locale),
+                    t("tab.diagnostics", locale),
+                    t("tab.snapshot", locale),
+                ]
+            )
+        else:
+            tab_aid, tab_sections, tab_fueling, tab_splits, tab_diagnostics, tab_snapshot = st.tabs(
+                [
                     t("tab.aid_stations", locale),
                     t("tab.sections", locale),
                     t("tab.fueling", locale),
                     t("tab.splits", locale),
-                    t("section.split_analysis", locale).replace("### ", ""),
+                    t("tab.diagnostics", locale),
+                    t("tab.snapshot", locale),
                 ]
             )
-        )
 
-        with tab_summary:
+        with tab_diagnostics:
             st.dataframe(
                 pd.DataFrame(
                     [
@@ -925,14 +1114,29 @@ def render_general_planner(repo_root: Path) -> None:
                 width="stretch",
                 hide_index=True,
             )
-
-        with tab_profile:
-            st.pyplot(plot_course_profile(loaded_course.trackpoints, chosen_course.aid_stops_km))
-            st.pyplot(plot_pace_profile(result))
-            st.pyplot(plot_cumulative_time(result, selected_event))
+            st.pyplot(plot_pace_profile(result, locale))
+            if is_road_result:
+                st.pyplot(plot_half_comparison(result, locale))
+                st.pyplot(plot_terrain_breakdown(result, locale))
+            else:
+                st.pyplot(plot_terrain_breakdown(result, locale))
+                st.pyplot(plot_half_comparison(result, locale))
 
         with tab_aid:
             if result.aid_station_etas:
+                st.markdown(t("section.aid_actions", locale))
+                station_cols = st.columns(2)
+                for idx, aid_eta in enumerate(result.aid_station_etas):
+                    tier = aid_tier_by_distance.get(round(aid_eta.distance_km, 2), "none")
+                    with station_cols[idx % 2]:
+                        st.markdown(
+                            f"**{aid_eta.label or t('aid.label_fallback', locale, n=idx + 1)}**\n\n"
+                            f"{t('col.distance_km', locale)}: {aid_eta.distance_km:.1f} km  \n"
+                            f"{t('col.arrival_clock', locale)}: {format_clock_time(selected_event, aid_eta.arrival_elapsed_time_min, locale)}  \n"
+                            f"{t('col.departure_clock', locale)}: {format_clock_time(selected_event, aid_eta.departure_elapsed_time_min, locale)}  \n"
+                            f"{t('col.tier', locale)}: {_aid_tier_label(tier, locale)}  \n"
+                            f"{_aid_station_action(tier, locale)}"
+                        )
                 st.markdown(t("section.aid_timing", locale))
                 st.dataframe(
                     [
@@ -980,6 +1184,18 @@ def render_general_planner(repo_root: Path) -> None:
                 st.info(t("msg.no_aid_stations", locale))
 
         with tab_sections:
+            st.markdown(t("section.section_cards", locale))
+            section_cols = st.columns(2)
+            for idx, segment in enumerate(result.segments):
+                with section_cols[idx % 2]:
+                    st.markdown(
+                        f"**{segment.section_name or segment.segment_type}**\n\n"
+                        f"{t('col.distance_km_short', locale)}: {segment.distance_km:.1f} km  \n"
+                        f"{t('section.card.terrain', locale)}: {segment.segment_type.title()}  \n"
+                        f"{t('summary.elev_gain', locale)}: +{segment.elevation_gain_m:.0f}m / -{segment.elevation_loss_m:.0f}m  \n"
+                        f"{t('section.card.pace_band', locale)}: {_pace_band_label(segment.avg_pace_min_km, average_pace_min_km, locale)}  \n"
+                        f"{t('section.pacing_cue', locale)}: {_section_cue(segment.segment_type, locale)}"
+                    )
             st.markdown(t("section.segment_pacing", locale))
             st.dataframe(
                 [
@@ -1015,19 +1231,9 @@ def render_general_planner(repo_root: Path) -> None:
             )
 
         with tab_fueling:
-            body_mass_kg = athlete_profile.get("body_mass_kg")
-            if body_mass_kg is None:
+            if fueling_plan is None:
                 st.info(t("msg.no_body_mass", locale))
             else:
-                aid_tiers = [station.tier for station in selected_course.aid_stations]
-                fueling_plan = build_fueling_plan(
-                    result,
-                    mass_kg=float(body_mass_kg),
-                    peak_temperature_c=peak_temperature_c,
-                    aid_station_tiers=aid_tiers,
-                    athlete_sweat_rate=athlete_profile.get("sweat_rate_l_hr"),
-                    gut_carb_tolerance_g_hr=athlete_profile.get("gut_carb_tolerance_g_hr"),
-                )
                 f_sum_a, f_sum_b, f_sum_c, f_sum_d = st.columns(4)
                 f_sum_a.metric(t("metric.total_kcal", locale), f"{fueling_plan.total_kcal:.0f}")
                 f_sum_b.metric(t("metric.avg_kcal_hr", locale), f"{fueling_plan.avg_kcal_hr:.0f}")
@@ -1040,6 +1246,17 @@ def render_general_planner(repo_root: Path) -> None:
                 if fueling_plan.warnings:
                     for warning in fueling_plan.warnings:
                         st.warning(_translate_message(warning, locale))
+                st.markdown(t("section.fueling_actions", locale))
+                fueling_cols = st.columns(2)
+                for idx, block in enumerate(fueling_plan.blocks):
+                    carry_text, station_text, fluid_text = _fueling_block_action(block, locale)
+                    with fueling_cols[idx % 2]:
+                        st.markdown(
+                            f"**{block.start_km:.1f}-{block.end_km:.1f} km**\n\n"
+                            f"{t('fueling.action.carry', locale)}: {carry_text}  \n"
+                            f"{t('fueling.action.station', locale)}: {station_text}  \n"
+                            f"{t('fueling.action.fluid', locale)}: {fluid_text}"
+                        )
                 st.markdown(t("section.per_block_fueling", locale))
                 st.dataframe(
                     pd.DataFrame(
@@ -1080,6 +1297,11 @@ def render_general_planner(repo_root: Path) -> None:
             block_options = split_block_options(result.total_distance_km)
             default_split_block = default_split_block_size(result.total_distance_km)
             block_index = block_options.index(default_split_block)
+            split_view_mode = st.selectbox(
+                t("control.split_view", locale),
+                options=["compact", "expanded"],
+                format_func=lambda value: t(f"control.split_view.{value}", locale),
+            )
             split_block_km = st.selectbox(
                 t("control.split_block_size", locale),
                 options=block_options,
@@ -1087,21 +1309,64 @@ def render_general_planner(repo_root: Path) -> None:
                 help=t("control.split_block_size.help", locale),
             )
             st.markdown(t("section.split_pacing", locale))
-            st.dataframe(
-                aggregate_split_rows(
-                    result.splits,
-                    loaded_course.trackpoints,
-                    selected_event,
-                    split_block_km,
-                    locale,
-                ),
-                width="stretch",
-                hide_index=True,
+            st.caption(t("section.compact_split_note", locale))
+            split_rows = aggregate_split_rows(
+                result.splits,
+                loaded_course.trackpoints,
+                selected_event,
+                split_block_km,
+                locale,
             )
+            split_frame = pd.DataFrame(split_rows)
+            split_frame[t("col.pace_band", locale)] = [
+                _pace_band_label(
+                    _split_pace_display_to_minutes(str(pace_display)),
+                    average_pace_min_km,
+                    locale,
+                )
+                for pace_display in split_frame[t("col.pace", locale)]
+            ]
+            if split_view_mode == "compact":
+                split_frame = split_frame[
+                    [
+                        t("col.split_range", locale),
+                        t("col.pace", locale),
+                        t("col.pace_band", locale),
+                        t("col.split_time", locale),
+                        t("col.elapsed", locale),
+                        t("col.clock", locale),
+                    ]
+                ]
+            st.dataframe(split_frame, width="stretch", hide_index=True)
 
-        with tab_analysis:
-            st.pyplot(plot_half_comparison(result))
-            st.pyplot(plot_terrain_breakdown(result, locale))
+        with tab_snapshot:
+            key_stations = result.aid_station_etas[:3]
+            key_sections = sorted(
+                result.segments, key=lambda segment: segment.segment_time_min, reverse=True
+            )[:3]
+            st.markdown(t("snapshot.title", locale))
+            snap_a, snap_b = st.columns(2)
+            with snap_a:
+                st.markdown(f"**{t('snapshot.key_stations', locale)}**")
+                for aid_eta in key_stations:
+                    st.markdown(
+                        f"- {aid_eta.label or t('aid.label_fallback', locale, n=1)}: {format_clock_time(selected_event, aid_eta.arrival_elapsed_time_min, locale)}"
+                    )
+                st.markdown(f"**{t('snapshot.fueling', locale)}**")
+                if fueling_plan is not None and fueling_plan.blocks:
+                    for block in fueling_plan.blocks[:3]:
+                        carry_text, _, _ = _fueling_block_action(block, locale)
+                        st.markdown(f"- {block.start_km:.1f}-{block.end_km:.1f} km: {carry_text}")
+                else:
+                    st.markdown("- -")
+            with snap_b:
+                st.markdown(f"**{t('snapshot.key_sections', locale)}**")
+                for segment in key_sections:
+                    st.markdown(
+                        f"- {segment.section_name or segment.segment_type}: {_section_cue(segment.segment_type, locale)}"
+                    )
+                st.markdown(f"**{t('snapshot.weather', locale)}**")
+                st.markdown(f"- {peak_temperature_c:.0f}°C")
 
         plan_json = export_plan_json(
             course_id=chosen_course.course_id,

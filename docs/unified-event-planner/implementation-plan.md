@@ -207,6 +207,20 @@ Status: In progress
     energy expenditure, carbohydrate and hydration demand, moving fuel
     schedules, and per-station fueling guidance differentiated by aid station
     capability
+- Presentation-layer overhaul completed:
+  - added a dedicated presentation-layer execution plan covering hero summary,
+    race-story layout, action surfaces, event-aware emphasis, and compact
+    race-day snapshot outputs
+  - reworked the live result view so the first visible output now emphasizes the
+    race story with a stronger summary surface, deterministic plan-meaning
+    narrative, and always-visible primary charts before the detailed tabs
+  - replaced parts of the raw output with more actionable surfaces for aid
+    stations, sections, and fueling while retaining the detailed tables for
+    deeper inspection
+  - differentiated road and trail result emphasis by tab order and narrative so
+    road races highlight target / split context while trail events highlight
+    terrain, sections, aid-station experience, and fueling consequences
+  - added a compact race-day snapshot surface for quick screenshot-style review
 
 ## Objective
 
