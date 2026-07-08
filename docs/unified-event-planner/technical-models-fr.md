@@ -194,6 +194,39 @@ Cela permet de comparer l'effort sur un parcours vallonné comme si on le projet
 
 ---
 
+## Poids Transporté
+
+**Module** : `race_planners/planner.py`
+
+### Principe
+
+Pour les événements trail et ultra, le planificateur tient compte du coût métabolique du transport d'un sac avec eau, nourriture et matériel. Ceci est appliqué comme un multiplicateur direct sur l'allure de chaque kilomètre.
+
+### Modèle
+
+Le coût métabolique du transport de poids sur le tronc est approximativement proportionnel au rapport entre le poids transporté et la masse corporelle :
+
+`multiplicateur_poids = 1.0 + (poids_transporté_kg / masse_corporelle_kg) × 0.8`
+
+Le facteur 0.8 (au lieu de 1.0) reflète que le poids porté sur les hanches/tronc est légèrement plus efficace que la masse corporelle, car il ne nécessite pas la même charge excentrique et la même stabilisation que les jambes.
+
+### Exemple
+
+Un coureur de 75 kg portant 3 kg :
+
+`multiplicateur = 1.0 + (3 / 75) × 0.8 = 1.0 + 0.032 = 1.032`
+
+Chaque kilomètre coûte 3,2 % d'énergie supplémentaire, ce qui se traduit par une allure environ 3,2 % plus lente.
+
+### Portée
+
+- Uniquement appliqué aux événements trail/ultra (les événements route utilisent un poids de zéro)
+- Nécessite `body_mass_kg` depuis le profil athlète
+- Le multiplicateur est constant pendant l'événement — il ne modélise pas le cycle de vidange/recharge entre les ravitaillements, car le poids moyen capture suffisamment bien l'effet
+- Appliqué avant le multiplicateur de fatigue, donc le coût se cumule avec la fatigue de fin de course
+
+---
+
 ## Ce qui est mesuré et ce qui est heuristique
 
 Le modèle combine trois catégories de données :

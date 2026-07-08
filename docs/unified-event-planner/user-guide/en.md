@@ -96,9 +96,9 @@ Trail and ultra events expose more terrain-specific controls:
 - **Climb-to-Hike Threshold**
 - **Descent Caution**
 - **Fade Profile**
-- **Aid Stop Time (min)**
+- **Aid Stop Time (min)** — with per-tier duration controls (water-only, standard, full-service)
 - **Peak Temperature**
-- optional **Advanced Trail Controls** such as **Effort Policy** and **Use Derived HR Guardrail**
+- optional **Advanced Trail Controls** such as **Effort Policy**, **Use Derived HR Guardrail**, and **Average Carried Weight**
 
 ## What the key controls mean
 
@@ -149,6 +149,16 @@ Only useful if you entered enough athlete profile data for the planner to estima
 ### Peak Temperature
 
 The planner uses the expected peak temperature and the event start time to estimate a diurnal heat curve across the race.
+
+### Average Carried Weight
+
+Trail advanced control.
+
+Enter the average weight of pack, water, food, and gear you expect to carry throughout the event. This is not the starting weight — it's your best estimate of what you carry on average between refills.
+
+The planner uses this to increase the metabolic cost of every kilometer. For example, a 75 kg runner carrying 3 kg adds roughly 3.2% to the energy cost of each kilometer, which translates directly to slower pace.
+
+Requires **Body Mass** in the Athlete Profile to take effect.
 
 ## Reading the results
 

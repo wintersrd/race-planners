@@ -96,9 +96,9 @@ Les événements trail et ultra exposent davantage de contrôles liés au terrai
 - **Seuil Marche/Course**
 - **Prudence en Descente**
 - **Profil de Dégradation**
-- **Temps d'Arrêt Ravito (min)**
+- **Temps d'Arrêt Ravito (min)** — avec durées par type de station (eau seule, standard, ravitaillement complet)
 - **Température Maximale Prévue**
-- **Contrôles Trail Avancés** optionnels comme **Politique d'Effort** et **Utiliser le Garde-fou FC Dérivé**
+- **Contrôles Trail Avancés** optionnels comme **Politique d'Effort**, **Utiliser le Garde-fou FC Dérivé** et **Poids Moyen Transporté**
 
 ## Signification des principaux contrôles
 
@@ -149,6 +149,16 @@ Il n'est utile que si vous avez saisi suffisamment de données dans le profil at
 ### Température Maximale Prévue
 
 Le planificateur utilise la température maximale prévue et l'heure de départ pour estimer une courbe de chaleur diurne sur toute la course.
+
+### Poids Moyen Transporté
+
+Contrôle trail avancé.
+
+Saisissez le poids moyen du sac, de l'eau, de la nourriture et du matériel que vous prévoyez de transporter pendant l'événement. Il ne s'agit pas du poids de départ, mais de votre meilleure estimation de ce que vous portez en moyenne entre les ravitaillements.
+
+Le planificateur utilise cette valeur pour augmenter le coût métabolique de chaque kilomètre. Par exemple, un coureur de 75 kg portant 3 kg ajoute environ 3,2 % au coût énergétique de chaque kilomètre, ce qui se traduit directement par une allure plus lente.
+
+Nécessite le **Poids Corporel** dans le Profil de l'Athlète pour prendre effet.
 
 ## Lire les résultats
 

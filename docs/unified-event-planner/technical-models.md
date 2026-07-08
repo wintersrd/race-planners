@@ -328,6 +328,46 @@ GAP uses a polynomial to convert uphill/downhill grades into pace equivalents. T
 
 This allows the planner to compare effort across hilly courses as if they were flat, which is essential for deriving pace targets from road-based threshold data.
 
+---
+
+## Carried Weight
+
+**Module**: `race_planners/planner.py`
+
+### Overview
+
+For trail and ultra events, the planner accounts for the metabolic cost of carrying a pack with water, food, and gear. This is applied as a direct multiplier on pace for every kilometer.
+
+### Model
+
+The metabolic cost of carrying weight on the torso is approximately proportional to the ratio of carried weight to body mass:
+
+`carried_weight_multiplier = 1.0 + (carried_weight_kg / body_mass_kg) × 0.8`
+
+The factor of 0.8 (rather than 1.0) reflects that weight carried on the hips/torso is slightly more efficient than body mass, because it doesn't require the same eccentric loading and stabilization as the legs.
+
+### Example
+
+A 75 kg runner carrying 3 kg:
+
+`multiplier = 1.0 + (3 / 75) × 0.8 = 1.0 + 0.032 = 1.032`
+
+Every kilometer costs 3.2% more energy, which translates to approximately 3.2% slower pace.
+
+### Scope
+
+- Only applied to trail/ultra events (road events set carried weight to zero)
+- Requires `body_mass_kg` from the athlete profile
+- The multiplier is constant across the event — it does not model the draw-down/refill cycle between aid stations, because the average weight captures the effect well enough
+- Applied before the fatigue multiplier, so the cost compounds with late-race fatigue
+
+### Validation
+
+Tested against a real GRF56 result (75 kg runner, 3 kg pack):
+
+- Without carried weight: predicted 6:24 vs actual 6:35
+- With carried weight: predicted ~6:36 vs actual 6:35
+
 ## What is heuristic vs what is measured
 
 The model mixes three kinds of inputs:
