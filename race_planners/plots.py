@@ -91,9 +91,9 @@ def plot_pace_profile(result: PlanResult, locale: str = "en") -> Figure:
     from matplotlib.patches import Patch
 
     legend_elements = [
-        Patch(facecolor=(0.2, 0.7, 0.3), alpha=0.7, label=t("pace_band.fast", locale)),
-        Patch(facecolor=(0.9, 0.8, 0.2), alpha=0.7, label=t("pace_band.on_target", locale)),
-        Patch(facecolor=(0.85, 0.25, 0.2), alpha=0.7, label=t("pace_band.costly", locale)),
+        Patch(facecolor=(0.2, 0.7, 0.3), alpha=0.7, label=t("pace_band.faster", locale)),
+        Patch(facecolor=(0.9, 0.8, 0.2), alpha=0.7, label=t("pace_band.near_avg", locale)),
+        Patch(facecolor=(0.85, 0.25, 0.2), alpha=0.7, label=t("pace_band.slower", locale)),
     ]
     ax.legend(handles=legend_elements, loc="upper right", fontsize=8)
 
