@@ -31,10 +31,30 @@ def heat_multiplier(temperature_c: float) -> float:
     return 1.0
 
 
+def _seasonal_params(event_month: int | None) -> tuple[float, float]:
+    """Return (diurnal_swing_c, coldest_hour) for a given month.
+
+    Heuristic model for mid-latitude Northern Hemisphere (~48°N):
+    - Swing peaks in summer (~15°C) and bottoms in winter (~6°C)
+    - Coldest point shifts slightly later in winter (dawn is later)
+    """
+    if event_month is None:
+        return 12.0, 4.0
+    # Summer solstice ~month 6 (June), winter ~month 12 (December)
+    seasonal_angle = 2.0 * math.pi * (event_month - 6) / 12.0
+    swing = 10.5 + 4.5 * math.cos(seasonal_angle)
+    coldest_hour = 4.5 - 0.5 * math.cos(seasonal_angle)
+    return swing, coldest_hour
+
+
 def temperature_at_elapsed(
-    peak_temp_c: float, elapsed_hours: float, start_time_local: str | None
+    peak_temp_c: float,
+    elapsed_hours: float,
+    start_time_local: str | None,
+    event_month: int | None = None,
 ) -> float:
-    temp_min = peak_temp_c - 12.0
+    swing, coldest_hour = _seasonal_params(event_month)
+    temp_min = peak_temp_c - swing
     if start_time_local:
         try:
             parts = start_time_local.split(":")
@@ -44,8 +64,8 @@ def temperature_at_elapsed(
     else:
         start_hour = 9.0
     wall_hour = (start_hour + elapsed_hours) % 24.0
-    phase = 2.0 * math.pi * ((wall_hour - 4.0) / 24.0)
-    return temp_min + (peak_temp_c - temp_min) * 0.5 * (1.0 - math.cos(phase))
+    phase = 2.0 * math.pi * ((wall_hour - coldest_hour) / 24.0)
+    return temp_min + swing * 0.5 * (1.0 - math.cos(phase))
 
 
 def segment_heat_multiplier(config: PacingConfig, cumulative_time_min: float) -> float:
@@ -55,6 +75,7 @@ def segment_heat_multiplier(config: PacingConfig, cumulative_time_min: float) ->
         config.peak_temperature_c,
         cumulative_time_min / 60.0,
         config.event_start_time_local,
+        getattr(config, "event_month", None),
     )
     raw_heat_multiplier = heat_multiplier(temp)
     return 1.0 + (
@@ -66,6 +87,7 @@ def average_heat_multiplier_for_duration(
     peak_temperature_c: float | None,
     start_time_local: str | None,
     duration_min: float,
+    event_month: int | None = None,
 ) -> float:
     if peak_temperature_c is None or duration_min <= 0:
         return 1.0
@@ -75,6 +97,6 @@ def average_heat_multiplier_for_duration(
     for index in range(sample_count):
         elapsed_hours = (duration_min * ((index + 0.5) / sample_count)) / 60.0
         total_multiplier += heat_multiplier(
-            temperature_at_elapsed(peak_temperature_c, elapsed_hours, start_time_local)
+            temperature_at_elapsed(peak_temperature_c, elapsed_hours, start_time_local, event_month)
         )
     return total_multiplier / sample_count

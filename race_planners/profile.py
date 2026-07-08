@@ -255,6 +255,9 @@ def default_config() -> dict[str, Any]:
         "climb_hike_threshold_percent": 12.0,
         "descent_caution": "medium",
         "rest_duration_sec": 30,
+        "rest_duration_water_only_sec": 240,
+        "rest_duration_standard_sec": 480,
+        "rest_duration_full_service_sec": 720,
         "pacing_bias": 0.0,
         "fade_profile_preset": "stable",
         "fade_early_bias": None,
@@ -294,7 +297,10 @@ def default_config_for_event(
             athlete_profile, event.race_model
         )
         config["target_finish_time_min"] = selected_capability_time_min or 240.0
-        config["rest_duration_sec"] = 15
+        config["rest_duration_sec"] = 10
+        config["rest_duration_water_only_sec"] = 240
+        config["rest_duration_standard_sec"] = 480
+        config["rest_duration_full_service_sec"] = 720
         config["race_intent"] = "controlled"
         config["marathon_pace_min_km"] = road_anchor_default_from_profile(
             athlete_profile,
@@ -305,6 +311,9 @@ def default_config_for_event(
         config["input_mode"] = "effort_anchor"
         config["target_finish_time_min"] = None
         config["rest_duration_sec"] = 180
+        config["rest_duration_water_only_sec"] = 240
+        config["rest_duration_standard_sec"] = 480
+        config["rest_duration_full_service_sec"] = 720
         config["fade_profile_preset"] = derived_fade_preset(athlete_profile)
         config["effort_policy"] = derived_effort_policy(athlete_profile)
         config["use_hr_guardrail"] = (

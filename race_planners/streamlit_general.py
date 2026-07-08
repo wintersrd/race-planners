@@ -253,6 +253,9 @@ def render_general_planner(repo_root: Path) -> None:
     use_hr_guardrail = bool(cfg.get("use_hr_guardrail", False))
     derived_hr_cap: int | None = None
     rest_duration_sec = int(cfg.get("rest_duration_sec", 30))
+    rest_duration_water_only_sec = int(cfg.get("rest_duration_water_only_sec", 240))
+    rest_duration_standard_sec = int(cfg.get("rest_duration_standard_sec", 480))
+    rest_duration_full_service_sec = int(cfg.get("rest_duration_full_service_sec", 720))
 
     with st.sidebar:
         locale_options = list(AVAILABLE_LOCALES)
@@ -688,6 +691,35 @@ def render_general_planner(repo_root: Path) -> None:
             )
             rest_duration_sec = int(rest_duration_min * 60)
 
+            event_tiers = {station.tier for station in selected_course.aid_stations}
+            if "water_only" in event_tiers:
+                water_only_min = st.slider(
+                    f"{t('tier.water_only', locale)} — {t('control.aid_stop_time_min', locale)}",
+                    min_value=0.0,
+                    max_value=15.0,
+                    value=round(float(cfg.get("rest_duration_water_only_sec", 240)) / 60.0, 1),
+                    step=0.5,
+                )
+                rest_duration_water_only_sec = int(water_only_min * 60)
+            if "standard" in event_tiers:
+                standard_min = st.slider(
+                    f"{t('tier.standard', locale)} — {t('control.aid_stop_time_min', locale)}",
+                    min_value=0.0,
+                    max_value=20.0,
+                    value=round(float(cfg.get("rest_duration_standard_sec", 480)) / 60.0, 1),
+                    step=0.5,
+                )
+                rest_duration_standard_sec = int(standard_min * 60)
+            if "full_service" in event_tiers:
+                full_service_min = st.slider(
+                    f"{t('tier.full_service', locale)} — {t('control.aid_stop_time_min', locale)}",
+                    min_value=0.0,
+                    max_value=30.0,
+                    value=round(float(cfg.get("rest_duration_full_service_sec", 720)) / 60.0, 1),
+                    step=1.0,
+                )
+                rest_duration_full_service_sec = int(full_service_min * 60)
+
         st.markdown(t("section.weather", locale))
         peak_temperature_c = st.number_input(
             t("control.peak_temp", locale),
@@ -921,6 +953,9 @@ def render_general_planner(repo_root: Path) -> None:
         climb_hike_threshold_percent=climb_hike_threshold_percent,
         descent_caution=descent_caution,
         rest_duration_sec=rest_duration_sec,
+        rest_duration_water_only_sec=rest_duration_water_only_sec,
+        rest_duration_standard_sec=rest_duration_standard_sec,
+        rest_duration_full_service_sec=rest_duration_full_service_sec,
         pacing_bias=pacing_bias,
         fade_profile_preset=None if is_road_event(selected_event) else fade_profile_preset,
         fade_early_bias=None if is_road_event(selected_event) else fade_early_bias,
@@ -946,6 +981,7 @@ def render_general_planner(repo_root: Path) -> None:
         hr_cap=(None if is_road_event(selected_event) or not use_hr_guardrail else derived_hr_cap),
         peak_temperature_c=peak_temperature_c,
         event_start_time_local=selected_event.start_time_local,
+        event_month=selected_event.event_month,
     )
     st.session_state["general_config"] = asdict(new_config)
     st.session_state["general_athlete_profile"] = normalized_athlete_profile(athlete_profile)
@@ -1367,6 +1403,7 @@ def render_general_planner(repo_root: Path) -> None:
                         selected_event.start_time_local,
                         result.total_time_min,
                         locale,
+                        selected_event.event_month,
                     )
                 )
                 st.markdown(f"**{t('weather.impact_title', locale)}**")
@@ -1378,6 +1415,7 @@ def render_general_planner(repo_root: Path) -> None:
                         result.total_time_min,
                         result.splits,
                         locale,
+                        selected_event.event_month,
                     )
                 )
                 avg_penalty_pct = 0.0
@@ -1386,6 +1424,7 @@ def render_general_planner(repo_root: Path) -> None:
                         peak_temperature_c,
                         selected_event.start_time_local,
                         result.moving_time_min,
+                        selected_event.event_month,
                     )
                     avg_penalty_pct = (avg_multiplier - 1.0) * 100.0
                 st.caption(t("weather.avg_penalty", locale, penalty=avg_penalty_pct))

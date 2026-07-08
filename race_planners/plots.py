@@ -219,11 +219,12 @@ def plot_temperature_curve(
     start_time_local: str | None,
     total_time_min: float,
     locale: str = "en",
+    event_month: int | None = None,
 ) -> Figure:
     from race_planners.weather import temperature_at_elapsed
 
     hours = np.linspace(0, total_time_min / 60.0, max(int(total_time_min / 10), 20))
-    temps = [temperature_at_elapsed(peak_temp_c, hr, start_time_local) for hr in hours]
+    temps = [temperature_at_elapsed(peak_temp_c, hr, start_time_local, event_month) for hr in hours]
 
     fig, ax = plt.subplots(figsize=(10, 3.5))
     ax.plot(hours, temps, color="#E94F37", linewidth=2.5)
@@ -243,6 +244,7 @@ def plot_heat_impact(
     total_time_min: float,
     splits: list[Any],
     locale: str = "en",
+    event_month: int | None = None,
 ) -> Figure:
     from race_planners.weather import heat_multiplier, temperature_at_elapsed
 
@@ -252,7 +254,7 @@ def plot_heat_impact(
     cumulative_time = 0.0
     for split in splits:
         elapsed_hr = cumulative_time / 60.0
-        temp_c = temperature_at_elapsed(peak_temp_c, elapsed_hr, start_time_local)
+        temp_c = temperature_at_elapsed(peak_temp_c, elapsed_hr, start_time_local, event_month)
         penalty = (heat_multiplier(temp_c) - 1.0) * 100.0
         penalties.append(max(penalty, 0.0))
         cumulative_time = split.cumulative_time_min

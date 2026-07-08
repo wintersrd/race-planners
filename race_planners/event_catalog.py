@@ -64,6 +64,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             aid_stops_km=[5.3, 9.1, 14.5],
             aid_station_tiers={5.3: "water_only", 9.1: "water_only"},
             baseline_peak_temp_c=16.0,
+            event_month=9,  # September
         ),
         CuratedEvent(
             event_id="grf56",
@@ -82,6 +83,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             },
             start_time_local="12:30",
             baseline_peak_temp_c=18.0,
+            event_month=9,  # September
         ),
         CuratedEvent(
             event_id="grf92",
@@ -103,6 +105,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             },
             start_time_local="06:30",
             baseline_peak_temp_c=20.0,
+            event_month=9,  # September
         ),
         CuratedEvent(
             event_id="grf166",
@@ -128,6 +131,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             },
             start_time_local="17:00",
             baseline_peak_temp_c=20.0,
+            event_month=9,  # September
         ),
         CuratedEvent(
             event_id="marathon-etoiles-baie",
@@ -140,6 +144,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             terrain="road",
             start_time_local="09:00",
             baseline_peak_temp_c=16.0,
+            event_month=5,  # May
         ),
         CuratedEvent(
             event_id="trail-odet-ultra",
@@ -158,6 +163,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             },
             start_time_local="11:00",
             baseline_peak_temp_c=20.0,
+            event_month=6,  # June
         ),
     )
 

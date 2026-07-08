@@ -79,6 +79,7 @@ class CuratedEvent:
     default_input_mode: str = "finish_time"
     start_time_local: str | None = None
     baseline_peak_temp_c: float | None = None
+    event_month: int | None = None
 
 
 @dataclass
@@ -118,6 +119,9 @@ class PacingConfig:
     climb_hike_threshold_percent: float = 12.0
     descent_caution: str = "medium"
     rest_duration_sec: int = 30
+    rest_duration_water_only_sec: int = 240
+    rest_duration_standard_sec: int = 480
+    rest_duration_full_service_sec: int = 720
     pacing_bias: float = 0.0
     fade_profile_preset: str | None = None
     fade_early_bias: float | None = None
@@ -139,6 +143,7 @@ class PacingConfig:
     hr_cap: int | None = None
     peak_temperature_c: float | None = None
     event_start_time_local: str | None = None
+    event_month: int | None = None
 
 
 @dataclass

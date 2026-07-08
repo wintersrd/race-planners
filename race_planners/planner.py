@@ -94,11 +94,33 @@ def _build_model(
     raise ValueError("road/half model requires marathon pace or target finish time")
 
 
-def _target_running_time_min(config: PacingConfig, aid_stop_count: int) -> float | None:
+def _rest_duration_sec_for_station(config: PacingConfig, aid_station: AidStation) -> float:
+    if is_road_race_model(config.race_model):
+        return float(config.rest_duration_sec)
+    tier = getattr(aid_station, "tier", "standard") or "standard"
+    if tier == "water_only":
+        return float(config.rest_duration_water_only_sec)
+    if tier == "full_service":
+        return float(config.rest_duration_full_service_sec)
+    if tier == "standard":
+        return float(config.rest_duration_standard_sec)
+    return float(config.rest_duration_sec)
+
+
+def _total_rest_time_min(config: PacingConfig, valid_aid_stations: list[AidStation]) -> float:
+    total = 0.0
+    for station in valid_aid_stations:
+        total += _rest_duration_sec_for_station(config, station) / 60.0
+    return total
+
+
+def _target_running_time_min(
+    config: PacingConfig, valid_aid_stations: list[AidStation]
+) -> float | None:
     if config.target_finish_time_min is None:
         return None
 
-    total_rest_time_min = max(aid_stop_count, 0) * (config.rest_duration_sec / 60.0)
+    total_rest_time_min = _total_rest_time_min(config, valid_aid_stations)
     running_time_min = config.target_finish_time_min - total_rest_time_min
     if running_time_min <= 0:
         raise ValueError("Rest time exceeds target finish time")
@@ -117,9 +139,9 @@ def _normalize_config(
     config: PacingConfig,
     trackpoints: list[TrackPoint],
     total_distance_km: float,
-    aid_stop_count: int,
+    valid_aid_stations: list[AidStation],
 ) -> PacingConfig:
-    target_running_time_min = _target_running_time_min(config, aid_stop_count)
+    target_running_time_min = _target_running_time_min(config, valid_aid_stations)
     if target_running_time_min is None or total_distance_km <= 0:
         return config
 
@@ -303,7 +325,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         config,
         trackpoints,
         total_distance_km,
-        len(valid_aid_stations),
+        valid_aid_stations,
     )
     model = _build_model(config, trackpoints, total_distance_km)
 
@@ -362,8 +384,8 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
 
     aid_arrival_times: list[float] = []
     aid_station_etas: list[AidStationEta] = []
-    total_rest_time_min = len(valid_aid_stations) * (config.rest_duration_sec / 60.0)
-    for stop_index, aid_station in enumerate(valid_aid_stations, start=1):
+    cumulative_rest_min = 0.0
+    for aid_station in valid_aid_stations:
         aid_km = aid_station.distance_km
         elapsed = 0.0
         prev_km = 0.0
@@ -380,7 +402,8 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
             elapsed += split.segment_time_min
             prev_km = split_end
         aid_arrival_times.append(elapsed)
-        prior_rest_time_min = (stop_index - 1) * (config.rest_duration_sec / 60.0)
+        station_rest_min = _rest_duration_sec_for_station(config, aid_station) / 60.0
+        prior_rest_time_min = cumulative_rest_min
         split_distance_km = aid_km - (aid_station_etas[-1].distance_km if aid_station_etas else 0.0)
         split_from_prev_min = elapsed - (
             aid_station_etas[-1].arrival_moving_time_min if aid_station_etas else 0.0
@@ -388,6 +411,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         actual_pace_min_km = (
             split_from_prev_min / split_distance_km if split_distance_km > 0 else 0.0
         )
+        cumulative_rest_min += station_rest_min
         aid_station_etas.append(
             AidStationEta(
                 distance_km=aid_km,
@@ -396,19 +420,19 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
                 waypoint_type=aid_station.waypoint_type,
                 arrival_moving_time_min=elapsed,
                 arrival_elapsed_time_min=elapsed + prior_rest_time_min,
-                departure_elapsed_time_min=elapsed
-                + prior_rest_time_min
-                + (config.rest_duration_sec / 60.0),
+                departure_elapsed_time_min=elapsed + prior_rest_time_min + station_rest_min,
                 split_from_prev_min=split_from_prev_min,
                 split_distance_km=split_distance_km,
                 actual_pace_min_km=actual_pace_min_km,
-                suggested_rest_min=config.rest_duration_sec / 60.0,
+                suggested_rest_min=station_rest_min,
             )
         )
 
+    total_rest_time_min = cumulative_rest_min
+
     assumptions: list[str] = []
     warnings: list[str] = []
-    if aid_station_etas and config.rest_duration_sec > 0:
+    if aid_station_etas and total_rest_time_min > 0:
         assumptions.append("assumption.rest_stops")
     if is_road_race_model(config.race_model) and config.pacing_bias != 0:
         assumptions.append("assumption.pacing_bias")
