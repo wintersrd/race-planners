@@ -185,6 +185,8 @@ class AidStationEta:
     split_distance_km: float = 0.0
     actual_pace_min_km: float = 0.0
     suggested_rest_min: float = 0.0
+    elevation_gain_m: float = 0.0
+    elevation_loss_m: float = 0.0
 
 
 @dataclass

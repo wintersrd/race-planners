@@ -13,6 +13,7 @@ from race_planners.fatigue import (
 )
 from race_planners.grade import (
     calculate_segment_grades,
+    elevation_changes,
     estimate_course_gap_multiplier,
     extreme_grade_in_range,
     parse_gpx,
@@ -387,6 +388,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
     cumulative_rest_min = 0.0
     for aid_station in valid_aid_stations:
         aid_km = aid_station.distance_km
+        prev_station_km = aid_station_etas[-1].distance_km if aid_station_etas else 0.0
         elapsed = 0.0
         prev_km = 0.0
         for split in splits:
@@ -404,12 +406,15 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         aid_arrival_times.append(elapsed)
         station_rest_min = _rest_duration_sec_for_station(config, aid_station) / 60.0
         prior_rest_time_min = cumulative_rest_min
-        split_distance_km = aid_km - (aid_station_etas[-1].distance_km if aid_station_etas else 0.0)
+        split_distance_km = aid_km - prev_station_km
         split_from_prev_min = elapsed - (
             aid_station_etas[-1].arrival_moving_time_min if aid_station_etas else 0.0
         )
         actual_pace_min_km = (
             split_from_prev_min / split_distance_km if split_distance_km > 0 else 0.0
+        )
+        block_gain_m, block_loss_m = elevation_changes(
+            trackpoints, prev_station_km * 1000, aid_km * 1000
         )
         cumulative_rest_min += station_rest_min
         aid_station_etas.append(
@@ -425,6 +430,8 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
                 split_distance_km=split_distance_km,
                 actual_pace_min_km=actual_pace_min_km,
                 suggested_rest_min=station_rest_min,
+                elevation_gain_m=round(block_gain_m, 1),
+                elevation_loss_m=round(block_loss_m, 1),
             )
         )
 

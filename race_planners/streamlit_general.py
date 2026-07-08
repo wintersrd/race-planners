@@ -1201,6 +1201,7 @@ def render_general_planner(repo_root: Path) -> None:
                             t("col.section", locale): aid_eta.label
                             or t("aid.label_fallback", locale, n=idx + 1),
                             t("col.distance_km", locale): round(aid_eta.distance_km, 2),
+                            t("col.split_distance_km", locale): round(aid_eta.split_distance_km, 2),
                             t("col.arrival_elapsed", locale): format_duration_minutes(
                                 aid_eta.arrival_elapsed_time_min
                             ),
@@ -1223,6 +1224,8 @@ def render_general_planner(repo_root: Path) -> None:
                             t("col.split_pace", locale): format_pace_minutes(
                                 aid_eta.actual_pace_min_km
                             ),
+                            t("col.elev_gain_m", locale): round(aid_eta.elevation_gain_m, 1),
+                            t("col.elev_loss_m", locale): round(aid_eta.elevation_loss_m, 1),
                             t("col.rest_time", locale): format_duration_minutes(
                                 aid_eta.suggested_rest_min
                             ),
