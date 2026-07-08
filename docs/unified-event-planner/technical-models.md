@@ -1,6 +1,17 @@
-# Technical Modeling Reference
+# Race Prediction Modeler — Technical Modeling Reference
 
-This document explains the mathematical models and algorithms behind the Unified Event Planner. It is written for curious runners who want to understand the assumptions, and for developers who need to trace the logic in the code.
+This document explains the mathematical models and algorithms behind the Race Prediction Modeler. It is written for curious runners who want to understand the assumptions, and for developers who need to trace the logic in the code.
+
+## References and inspiration
+
+This tool is not a laboratory-grade physiology engine, but it does borrow from established ideas in endurance science and race modeling:
+
+- Minetti AE et al. on the metabolic cost of gradient running and walking
+- Common running-economy heuristics around `~1 kcal / kg / km`
+- Threshold-based pacing models that interpolate between LT1-like and LT2-like effort anchors
+- Standard ultra fueling guidance in the range of roughly `30-90 g carbs / hour`, constrained by gut tolerance and event duration
+
+Where the app uses heuristics instead of direct literature equations, those heuristics are stated explicitly below.
 
 ---
 
@@ -38,6 +49,13 @@ The solver iterates because duration depends on pace, and pace depends on durati
 5. Repeat until the duration stabilizes (up to 24 iterations)
 
 This converges quickly because the fraction changes slowly with duration.
+
+In shorthand, the loop is:
+
+1. `duration_guess -> effort_fraction`
+2. `LT1 pace + effort_fraction * (LT2 pace - LT1 pace) -> modeled race pace`
+3. `modeled race pace * race distance -> new duration`
+4. Repeat until `abs(new_duration - old_duration)` is small
 
 ### Course and Weather Adjustments
 
@@ -109,6 +127,10 @@ The athlete's heat tolerance (-1.0 to +1.0) scales the penalty:
 - Negative values amplify it (worse heat coping)
 - The scaling uses a `tolerance_penalty_scale` function that clamps the effect between 0.6× and 1.4× the base penalty
 
+In practice this means the user-facing heat penalty is:
+
+`effective_penalty = base_penalty * tolerance_scale(heat_tolerance)`
+
 ---
 
 ## Fatigue, Fade, and Durability
@@ -141,6 +163,12 @@ Fade profiles describe how pace deteriorates across an ultra event. Each preset 
 
 The fade multiplier is: `1.0 + fade_bias × 0.006`, where `fade_bias` is interpolated across the three phases.
 
+The interpolation is piecewise-linear:
+
+- `0% -> 33%` event progress: blend from early toward mid
+- `33% -> 66%`: blend through the middle of the event
+- `66% -> 100%`: blend from mid toward late fade
+
 ### Durability Multiplier
 
 The durability factor (-1.0 to +1.0) applies a time-and-distance-weighted pace penalty:
@@ -155,6 +183,8 @@ This means durability has minimal effect on a half marathon but dramatically aff
 - 21 km event: ~0.9 min swing between durable (+1.0) and fragile (-1.0)
 - 92 km event: ~98 min swing
 - 166 km event: ~198 min swing
+
+The important design choice is that durability is **not** treated as a flat multiplier. It is intentionally time-and-distance weighted so the impact stays tiny on short events and becomes very large late in long events.
 
 ---
 
@@ -199,6 +229,12 @@ When estimated HR exceeds the dynamic ceiling:
 
 This slows you down more on steep terrain and late in the race, which is exactly when HR management matters most.
 
+In shorthand:
+
+`pace_penalty ~ severity * climb_weight * late_weight`
+
+with additional constants to keep the effect in a plausible range instead of producing wild pace collapses from small HR overshoots.
+
 ---
 
 ## Fueling and Nutrition Model
@@ -215,6 +251,12 @@ Energy cost is based on the standard running economy approximation of ~1 kcal pe
 - **Steep downhill** (below -20%): capped to avoid negative costs
 
 This is derived from Minetti's metabolic cost data for gradient running.
+
+The simplified event-level heuristic is:
+
+`segment_kcal = body_mass_kg * distance_km * grade_cost_multiplier(grade_percent)`
+
+That is intentionally easier to reason about than a full biomechanical model, while still capturing the fact that steep uphill work costs much more than flat running.
 
 ### Carbohydrate Target Bands
 
@@ -266,6 +308,12 @@ This prevents unrealistic recommendations like "gel at minute 5 of a half marath
 
 The model accounts for both carried fuel (gels between stations) and on-site fuel (consumed at stations).
 
+This is deliberately practical rather than theoretical:
+
+- **water_only** means you should expect no meaningful calories at the station
+- **standard** means a modest carb and fluid contribution
+- **full_service** means a substantial on-site intake is possible, whether from race food or your own drop-bag setup
+
 ---
 
 ## Grade-Adjusted Pace (GAP)
@@ -279,3 +327,28 @@ GAP uses a polynomial to convert uphill/downhill grades into pace equivalents. T
 - Steep downhill (>10%) starts slowing pace again due to braking and impact
 
 This allows the planner to compare effort across hilly courses as if they were flat, which is essential for deriving pace targets from road-based threshold data.
+
+## What is heuristic vs what is measured
+
+The model mixes three kinds of inputs:
+
+1. **Measured / athlete-specific**
+   - LT1 HR and pace
+   - LT2 HR and pace
+   - best-likely race results
+   - trail slowdown assumptions
+   - gut tolerance / sweat rate
+
+2. **Course-derived**
+   - GPX distance
+   - elevation gain / loss
+   - grade distribution
+   - aid station positions and tiers
+
+3. **Heuristic / modeled**
+   - fade presets
+   - heat penalty curve
+   - HR guardrail phase offsets
+   - fueling startup/tail windows
+
+That mix is intentional. The goal is not to claim perfect physiological truth, but to make the assumptions explicit and useful enough for real planning.

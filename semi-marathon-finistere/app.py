@@ -1,4 +1,4 @@
-"""Unified Event Planner Streamlit entrypoint."""
+"""Race Prediction Modeler Streamlit entrypoint."""
 
 import os
 import sys
@@ -26,7 +26,7 @@ def ensure_streamlit_runtime() -> None:
 def configure_page() -> None:
     """Configure page metadata and shared styling once Streamlit is active."""
     st.set_page_config(
-        page_title="Unified Event Planner",
+        page_title="Race Prediction Modeler",
         page_icon="🏃‍♀️",
         layout="wide",
         initial_sidebar_state="expanded",

@@ -22,15 +22,15 @@ def test_every_key_has_both_en_and_fr() -> None:
 
 
 def test_t_returns_english_for_default_locale() -> None:
-    assert t("app.title") == "Unified Event Planner"
+    assert t("app.title") == "Race Prediction Modeler"
 
 
 def test_t_returns_french_for_fr_locale() -> None:
-    assert t("app.title", "fr") == "Planificateur d'Événements Unifié"
+    assert t("app.title", "fr") == "Modélisateur de Prédiction de Course"
 
 
 def test_t_falls_back_to_english_for_unknown_locale() -> None:
-    assert t("app.title", "de") == "Unified Event Planner"
+    assert t("app.title", "de") == "Race Prediction Modeler"
 
 
 def test_t_returns_key_itself_for_unknown_key() -> None:

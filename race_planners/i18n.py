@@ -13,17 +13,18 @@ DEFAULT_LOCALE = "en"
 TRANSLATIONS: dict[str, dict[str, str]] = {
     "en": {
         # ── Page chrome ──────────────────────────────────────────────
-        "app.title": "Unified Event Planner",
-        "app.caption": "Choose a curated event and plan it through one event-first pacing flow.",
+        "app.title": "Race Prediction Modeler",
+        "app.caption": "Model pacing, finish time, fueling, and station strategy for curated road and trail races.",
         "app.no_events": "No curated events are currently available in the repository.",
         "app.how_to_use_title": "How to use this planner",
         "app.how_to_use_body": (
             "1. **Select an event** from the sidebar.\n"
-            "2. **Choose your target mode** — finish time or effort anchor.\n"
-            "3. **Enter your target inputs** for the selected event type.\n"
-            "4. **Adjust strategy controls** (split bias, fade profile, terrain settings) as needed.\n"
-            "5. **Click Calculate Plan** to generate pacing, aid-station timing, sections, and fueling guidance.\n"
-            "6. **Download plan JSON** to save and reload your plan later."
+            "2. **Load or edit your Athlete Profile** with critical reference data (LT1/LT2, best-likely times, trail slowdowns, body mass).\n"
+            "3. **Click Apply Profile Defaults To This Event** if you want the current event to use those profile-driven defaults.\n"
+            "4. **Choose your target mode** — finish time or effort anchor.\n"
+            "5. **Adjust strategy controls** (split bias, fade profile, terrain settings, weather) as needed.\n"
+            "6. **Click Calculate Plan** to generate pacing, aid-station timing, sections, fueling guidance, and split analysis.\n"
+            "7. **Download plan JSON** to save and reload your plan later."
         ),
         # ── Sidebar ──────────────────────────────────────────────────
         "sidebar.header": "Planner Controls",
@@ -271,6 +272,16 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # ── Sidebar documentation expanders ──────────────────────────
         "sidebar.user_guide": "User Guide",
         "sidebar.technical_models": "How the Models Work",
+        "sidebar.technical_reference": "Technical Reference",
+        "sidebar.doc_missing": "Documentation file not found: {path}",
+        "app.models_overview_body": (
+            "- **Road capability** estimates what your best-likely result looks like from your threshold paces, then adjusts it for hills and weather.\n"
+            "- **Trail pacing** combines terrain anchors, fade assumptions, and aid-station timing to model how your day unfolds.\n"
+            "- **Weather** slows the plan more as conditions get hotter, using the event start time and a daily temperature curve.\n"
+            "- **Durability** changes how strongly fatigue builds late in the event.\n"
+            "- **HR guardrail** optionally uses your LT1/LT2 profile to keep trail pacing from drifting too hard on steep or late-race segments.\n"
+            "- **Fueling** estimates calories, carbs, fluids, and what to carry between aid stations."
+        ),
         # ── Split analysis ───────────────────────────────────────────
         "section.split_analysis": "### Split Analysis",
         "split.first_half": "1st Half",
@@ -335,17 +346,18 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
     },
     "fr": {
         # ── Page chrome ──────────────────────────────────────────────
-        "app.title": "Planificateur d'Événements Unifié",
-        "app.caption": "Choisissez un événement pris en charge et planifiez-le via un seul flux de calcul d'allure.",
+        "app.title": "Modélisateur de Prédiction de Course",
+        "app.caption": "Modélisez l'allure, le temps final, la nutrition et la stratégie de ravitaillement pour des courses sur route et trail prises en charge.",
         "app.no_events": "Aucun événement pris en charge n'est actuellement disponible dans le dépôt.",
         "app.how_to_use_title": "Comment utiliser ce planificateur",
         "app.how_to_use_body": (
             "1. **Sélectionnez un événement** dans la barre latérale.\n"
-            "2. **Choisissez le mode de ciblage** — temps cible ou ancrage d'effort.\n"
-            "3. **Entrez vos paramètres cibles** selon le type d'événement.\n"
-            "4. **Ajustez les contrôles de stratégie** (biais de split, profil de dégradation, terrain) si besoin.\n"
-            "5. **Cliquez sur Calculer** pour générer l'allure, les horaires de ravitaillement, les sections et le plan nutritionnel.\n"
-            "6. **Téléchargez le plan JSON** pour sauvegarder et recharger votre plan ultérieurement."
+            "2. **Chargez ou renseignez votre Profil de l'Athlète** avec les données de référence critiques (LT1/LT2, temps optimaux, ralentissements trail, poids).\n"
+            "3. **Cliquez sur Appliquer les Valeurs par Défaut à cet Événement** si vous voulez utiliser immédiatement ces paramètres de profil pour l'événement courant.\n"
+            "4. **Choisissez le mode de ciblage** — temps cible ou ancrage d'effort.\n"
+            "5. **Ajustez les contrôles de stratégie** (biais de split, profil de dégradation, terrain, météo) si besoin.\n"
+            "6. **Cliquez sur Calculer** pour générer l'allure, les horaires de ravitaillement, les sections, la nutrition et l'analyse des splits.\n"
+            "7. **Téléchargez le plan JSON** pour sauvegarder et recharger votre plan ultérieurement."
         ),
         # ── Sidebar ──────────────────────────────────────────────────
         "sidebar.header": "Contrôles du Planificateur",
@@ -593,6 +605,16 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # ── Sidebar documentation expanders ──────────────────────────
         "sidebar.user_guide": "Guide Utilisateur",
         "sidebar.technical_models": "Comment Fonctionnent les Modèles",
+        "sidebar.technical_reference": "Référence Technique",
+        "sidebar.doc_missing": "Fichier de documentation introuvable : {path}",
+        "app.models_overview_body": (
+            "- **Capacité route** estime votre meilleur résultat probable à partir de vos allures de seuil, puis l'ajuste selon le dénivelé et la météo.\n"
+            "- **Allure trail** combine les ancres de terrain, les hypothèses de dégradation et le temps passé aux ravitaillements pour modéliser le déroulement de la journée.\n"
+            "- **Météo** ralentit davantage le plan quand la chaleur augmente, à partir de l'heure de départ et d'une courbe thermique journalière.\n"
+            "- **Durabilité** change la vitesse à laquelle la fatigue s'accumule en fin d'épreuve.\n"
+            "- **Garde-fou FC** peut utiliser votre profil LT1/LT2 pour éviter qu'un trail se transforme en dérive d'effort trop importante en montée ou en fin de course.\n"
+            "- **Nutrition** estime les calories, les glucides, l'hydratation et ce qu'il faut emporter entre les ravitaillements."
+        ),
         # ── Split analysis ───────────────────────────────────────────
         "section.split_analysis": "### Analyse des Splits",
         "split.first_half": "1ère Moitié",

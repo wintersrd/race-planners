@@ -84,6 +84,22 @@ def _translate_message(message: str, locale: str) -> str:
     return t(message, locale)
 
 
+def _read_markdown_doc(repo_root: Path, relative_path: str, locale: str) -> str:
+    doc_path = repo_root / relative_path
+    if not doc_path.exists():
+        return t("sidebar.doc_missing", locale, path=relative_path)
+    return doc_path.read_text(encoding="utf-8")
+
+
+def _translate_source_label(source: str, locale: str) -> str:
+    source_key_map = {
+        "Manual Profile": "source.manual_profile",
+        "Predictor": "source.predictor",
+        "LT-Derived Model": "source.lt_derived",
+    }
+    return t(source_key_map.get(source, source), locale)
+
+
 def render_general_planner(repo_root: Path) -> None:
     st.session_state.setdefault("general_locale", DEFAULT_LOCALE)
     locale = st.session_state["general_locale"]
@@ -95,9 +111,6 @@ def render_general_planner(repo_root: Path) -> None:
     st.session_state.setdefault("general_athlete_profile", default_athlete_profile())
     st.session_state.setdefault("general_event_id", "semi-marathon-finistere")
     st.session_state.setdefault("general_course_id", "semi-marathon-finistere")
-
-    with st.expander(t("app.how_to_use_title", locale)):
-        st.markdown(t("app.how_to_use_body", locale))
 
     events = list_curated_events(repo_root)
     if not events:
@@ -148,6 +161,19 @@ def render_general_planner(repo_root: Path) -> None:
         st.session_state["general_locale"] = locale
 
         st.header(t("sidebar.header", locale))
+        with st.expander(t("sidebar.user_guide", locale)):
+            guide_path = f"docs/unified-event-planner/user-guide/{locale}.md"
+            st.markdown(_read_markdown_doc(repo_root, guide_path, locale))
+        with st.expander(t("sidebar.technical_models", locale)):
+            st.markdown(t("app.models_overview_body", locale))
+        with st.expander(t("sidebar.technical_reference", locale)):
+            technical_doc_path = (
+                "docs/unified-event-planner/technical-models-fr.md"
+                if locale == "fr"
+                else "docs/unified-event-planner/technical-models.md"
+            )
+            st.markdown(_read_markdown_doc(repo_root, technical_doc_path, locale))
+
         with st.expander(t("expander.load_plan", locale)):
             loaded_plan = st.file_uploader(
                 t("control.plan_json", locale), type=["json"], key="plan_json_uploader"
@@ -202,190 +228,7 @@ def render_general_planner(repo_root: Path) -> None:
         race_model = selected_event.race_model
         cfg["race_model"] = race_model
 
-        st.markdown(t("section.event_setup", locale))
-        st.caption(t("caption.event_setup_road", locale))
-
-        input_mode = st.radio(
-            t("control.target_mode", locale),
-            options=["finish_time", "effort_anchor"],
-            index=0
-            if cfg.get("input_mode", selected_event.default_input_mode) == "finish_time"
-            else 1,
-            format_func=lambda mode: t(f"target_mode.{mode}", locale),
-            help=t("control.target_mode.help", locale),
-        )
-
-        if is_road_event(selected_event):
-            if input_mode == "finish_time":
-                target_finish_time_min = st.number_input(
-                    t("control.target_finish_time", locale),
-                    min_value=30.0,
-                    max_value=2400.0,
-                    value=float(cfg.get("target_finish_time_min") or 240.0),
-                    step=5.0,
-                )
-            else:
-                marathon_pace_min_km = st.number_input(
-                    t("control.anchor_pace", locale),
-                    min_value=3.0,
-                    max_value=20.0,
-                    value=float(cfg.get("marathon_pace_min_km") or 5.5),
-                    step=0.1,
-                    help=t("control.anchor_pace.help", locale),
-                )
-        elif race_model == "fire_road_ultra":
-            if input_mode == "finish_time":
-                target_finish_time_min = st.number_input(
-                    t("control.target_finish_time", locale),
-                    min_value=30.0,
-                    max_value=4000.0,
-                    value=float(cfg.get("target_finish_time_min") or 720.0),
-                    step=10.0,
-                )
-            else:
-                z1_pace_min_km = st.number_input(
-                    t("control.z1_pace", locale),
-                    min_value=4.0,
-                    max_value=25.0,
-                    value=float(cfg.get("z1_pace_min_km") or 8.0),
-                    step=0.1,
-                    help=t("control.z1_pace.help", locale),
-                )
-                z2_pace_min_km = st.number_input(
-                    t("control.z2_pace", locale),
-                    min_value=3.0,
-                    max_value=20.0,
-                    value=float(cfg.get("z2_pace_min_km") or 7.0),
-                    step=0.1,
-                    help=t("control.z2_pace.help", locale),
-                )
-                hike_pace_min_km = st.number_input(
-                    t("control.hike_pace", locale),
-                    min_value=5.0,
-                    max_value=40.0,
-                    value=float(cfg.get("hike_pace_min_km") or 12.0),
-                    step=0.1,
-                    help=t("control.hike_pace.fire_road.help", locale),
-                )
-        else:
-            if input_mode == "finish_time":
-                target_finish_time_min = st.number_input(
-                    t("control.target_finish_time", locale),
-                    min_value=30.0,
-                    max_value=4000.0,
-                    value=float(cfg.get("target_finish_time_min") or 720.0),
-                    step=10.0,
-                )
-            else:
-                flat_pace_min_km = st.number_input(
-                    t("control.flat_trail_pace", locale),
-                    min_value=4.0,
-                    max_value=25.0,
-                    value=float(cfg.get("flat_pace_min_km") or 8.5),
-                    step=0.1,
-                    help=t("control.flat_trail_pace.help", locale),
-                )
-                hike_pace_min_km = st.number_input(
-                    t("control.hike_pace", locale),
-                    min_value=5.0,
-                    max_value=40.0,
-                    value=float(cfg.get("hike_pace_min_km") or 13.0),
-                    step=0.1,
-                    help=t("control.hike_pace.technical.help", locale),
-                )
-
-        if is_road_event(selected_event):
-            st.markdown(t("section.race_strategy", locale))
-            race_intent = st.selectbox(
-                t("control.race_intent", locale),
-                options=list(ROAD_INTENT_PRESETS.keys()),
-                index=list(ROAD_INTENT_PRESETS.keys()).index(
-                    str(cfg.get("race_intent") or "controlled")
-                ),
-                format_func=lambda key: t(f"preset.intent.{key}", locale),
-                help=t("control.race_intent.help", locale),
-            )
-            pacing_bias = st.slider(
-                t("control.split_bias", locale),
-                min_value=-10.0,
-                max_value=10.0,
-                value=float(cfg.get("pacing_bias", 0.0)),
-                step=0.5,
-                help=t("control.split_bias.help", locale),
-            )
-            rest_duration_sec = st.slider(
-                t("control.aid_stop_time_sec", locale),
-                min_value=0,
-                max_value=90,
-                value=int(cfg.get("rest_duration_sec", 10)),
-                step=5,
-                help=t("control.aid_stop_time_sec.help", locale),
-            )
-        else:
-            st.markdown(t("section.terrain_fade", locale))
-            climb_hike_threshold_percent = st.slider(
-                t("control.climb_hike_threshold", locale),
-                min_value=5.0,
-                max_value=25.0,
-                value=float(cfg.get("climb_hike_threshold_percent", 12.0)),
-                step=0.5,
-                help=t("control.climb_hike_threshold.help", locale),
-            )
-            if race_model == "technical_trail_ultra":
-                descent_caution = st.selectbox(
-                    t("control.descent_caution", locale),
-                    options=["low", "medium", "high"],
-                    index=["low", "medium", "high"].index(cfg.get("descent_caution", "medium")),
-                    format_func=lambda val: t(f"preset.descent.{val}", locale),
-                    help=t("control.descent_caution.help", locale),
-                )
-            fade_profile_preset = st.selectbox(
-                t("control.fade_profile", locale),
-                options=list(FADE_PROFILE_PRESETS.keys()),
-                index=list(FADE_PROFILE_PRESETS.keys()).index(
-                    str(cfg.get("fade_profile_preset") or "progressive_fade")
-                ),
-                format_func=lambda key: t(f"preset.fade.{key}", locale),
-                help=t("control.fade_profile.help", locale),
-            )
-            fade_early_bias, fade_mid_bias, fade_late_bias = FADE_PROFILE_PRESETS[
-                fade_profile_preset
-            ][1]
-            st.caption(
-                t(
-                    "caption.fade_phases",
-                    locale,
-                    early=fade_early_bias,
-                    mid=fade_mid_bias,
-                    late=fade_late_bias,
-                )
-            )
-            rest_duration_min = st.slider(
-                t("control.aid_stop_time_min", locale),
-                min_value=0.0,
-                max_value=20.0,
-                value=round(float(cfg.get("rest_duration_sec", 180)) / 60.0, 1),
-                step=0.5,
-                help=t("control.aid_stop_time_min.help", locale),
-            )
-            rest_duration_sec = int(rest_duration_min * 60)
-
-        st.markdown(t("section.weather", locale))
-        peak_temperature_c = st.number_input(
-            t("control.peak_temp", locale),
-            min_value=0.0,
-            max_value=45.0,
-            value=float(
-                cfg.get(
-                    "peak_temperature_c",
-                    selected_event.baseline_peak_temp_c or 18.0,
-                )
-            ),
-            step=1.0,
-            help=t("control.peak_temp.help", locale),
-        )
-
-        with st.expander(t("expander.athlete_profile", locale)):
+        with st.expander(t("expander.athlete_profile", locale), expanded=True):
             st.caption(t("caption.athlete_profile", locale))
             uploaded_profile_json = st.file_uploader(
                 t("control.athlete_profile_json", locale),
@@ -571,6 +414,189 @@ def render_general_planner(repo_root: Path) -> None:
                 st.session_state.pop("general_loaded_course", None)
                 st.rerun()
 
+        st.markdown(t("section.event_setup", locale))
+        st.caption(t("caption.event_setup_road", locale))
+
+        input_mode = st.radio(
+            t("control.target_mode", locale),
+            options=["finish_time", "effort_anchor"],
+            index=0
+            if cfg.get("input_mode", selected_event.default_input_mode) == "finish_time"
+            else 1,
+            format_func=lambda mode: t(f"target_mode.{mode}", locale),
+            help=t("control.target_mode.help", locale),
+        )
+
+        if is_road_event(selected_event):
+            if input_mode == "finish_time":
+                target_finish_time_min = st.number_input(
+                    t("control.target_finish_time", locale),
+                    min_value=30.0,
+                    max_value=2400.0,
+                    value=float(cfg.get("target_finish_time_min") or 240.0),
+                    step=5.0,
+                )
+            else:
+                marathon_pace_min_km = st.number_input(
+                    t("control.anchor_pace", locale),
+                    min_value=3.0,
+                    max_value=20.0,
+                    value=float(cfg.get("marathon_pace_min_km") or 5.5),
+                    step=0.1,
+                    help=t("control.anchor_pace.help", locale),
+                )
+        elif race_model == "fire_road_ultra":
+            if input_mode == "finish_time":
+                target_finish_time_min = st.number_input(
+                    t("control.target_finish_time", locale),
+                    min_value=30.0,
+                    max_value=4000.0,
+                    value=float(cfg.get("target_finish_time_min") or 720.0),
+                    step=10.0,
+                )
+            else:
+                z1_pace_min_km = st.number_input(
+                    t("control.z1_pace", locale),
+                    min_value=4.0,
+                    max_value=25.0,
+                    value=float(cfg.get("z1_pace_min_km") or 8.0),
+                    step=0.1,
+                    help=t("control.z1_pace.help", locale),
+                )
+                z2_pace_min_km = st.number_input(
+                    t("control.z2_pace", locale),
+                    min_value=3.0,
+                    max_value=20.0,
+                    value=float(cfg.get("z2_pace_min_km") or 7.0),
+                    step=0.1,
+                    help=t("control.z2_pace.help", locale),
+                )
+                hike_pace_min_km = st.number_input(
+                    t("control.hike_pace", locale),
+                    min_value=5.0,
+                    max_value=40.0,
+                    value=float(cfg.get("hike_pace_min_km") or 12.0),
+                    step=0.1,
+                    help=t("control.hike_pace.fire_road.help", locale),
+                )
+        else:
+            if input_mode == "finish_time":
+                target_finish_time_min = st.number_input(
+                    t("control.target_finish_time", locale),
+                    min_value=30.0,
+                    max_value=4000.0,
+                    value=float(cfg.get("target_finish_time_min") or 720.0),
+                    step=10.0,
+                )
+            else:
+                flat_pace_min_km = st.number_input(
+                    t("control.flat_trail_pace", locale),
+                    min_value=4.0,
+                    max_value=25.0,
+                    value=float(cfg.get("flat_pace_min_km") or 8.5),
+                    step=0.1,
+                    help=t("control.flat_trail_pace.help", locale),
+                )
+                hike_pace_min_km = st.number_input(
+                    t("control.hike_pace", locale),
+                    min_value=5.0,
+                    max_value=40.0,
+                    value=float(cfg.get("hike_pace_min_km") or 13.0),
+                    step=0.1,
+                    help=t("control.hike_pace.technical.help", locale),
+                )
+
+        if is_road_event(selected_event):
+            st.markdown(t("section.race_strategy", locale))
+            race_intent = st.selectbox(
+                t("control.race_intent", locale),
+                options=list(ROAD_INTENT_PRESETS.keys()),
+                index=list(ROAD_INTENT_PRESETS.keys()).index(
+                    str(cfg.get("race_intent") or "controlled")
+                ),
+                format_func=lambda key: t(f"preset.intent.{key}", locale),
+                help=t("control.race_intent.help", locale),
+            )
+            pacing_bias = st.slider(
+                t("control.split_bias", locale),
+                min_value=-10.0,
+                max_value=10.0,
+                value=float(cfg.get("pacing_bias", 0.0)),
+                step=0.5,
+                help=t("control.split_bias.help", locale),
+            )
+            rest_duration_sec = st.slider(
+                t("control.aid_stop_time_sec", locale),
+                min_value=0,
+                max_value=90,
+                value=int(cfg.get("rest_duration_sec", 10)),
+                step=5,
+                help=t("control.aid_stop_time_sec.help", locale),
+            )
+        else:
+            st.markdown(t("section.terrain_fade", locale))
+            climb_hike_threshold_percent = st.slider(
+                t("control.climb_hike_threshold", locale),
+                min_value=5.0,
+                max_value=25.0,
+                value=float(cfg.get("climb_hike_threshold_percent", 12.0)),
+                step=0.5,
+                help=t("control.climb_hike_threshold.help", locale),
+            )
+            if race_model == "technical_trail_ultra":
+                descent_caution = st.selectbox(
+                    t("control.descent_caution", locale),
+                    options=["low", "medium", "high"],
+                    index=["low", "medium", "high"].index(cfg.get("descent_caution", "medium")),
+                    format_func=lambda val: t(f"preset.descent.{val}", locale),
+                    help=t("control.descent_caution.help", locale),
+                )
+            fade_profile_preset = st.selectbox(
+                t("control.fade_profile", locale),
+                options=list(FADE_PROFILE_PRESETS.keys()),
+                index=list(FADE_PROFILE_PRESETS.keys()).index(
+                    str(cfg.get("fade_profile_preset") or "progressive_fade")
+                ),
+                format_func=lambda key: t(f"preset.fade.{key}", locale),
+                help=t("control.fade_profile.help", locale),
+            )
+            fade_early_bias, fade_mid_bias, fade_late_bias = FADE_PROFILE_PRESETS[
+                fade_profile_preset
+            ][1]
+            st.caption(
+                t(
+                    "caption.fade_phases",
+                    locale,
+                    early=fade_early_bias,
+                    mid=fade_mid_bias,
+                    late=fade_late_bias,
+                )
+            )
+            rest_duration_min = st.slider(
+                t("control.aid_stop_time_min", locale),
+                min_value=0.0,
+                max_value=20.0,
+                value=round(float(cfg.get("rest_duration_sec", 180)) / 60.0, 1),
+                step=0.5,
+                help=t("control.aid_stop_time_min.help", locale),
+            )
+            rest_duration_sec = int(rest_duration_min * 60)
+
+        st.markdown(t("section.weather", locale))
+        peak_temperature_c = st.number_input(
+            t("control.peak_temp", locale),
+            min_value=0.0,
+            max_value=45.0,
+            value=float(
+                cfg.get(
+                    "peak_temperature_c",
+                    selected_event.baseline_peak_temp_c or 18.0,
+                )
+            ),
+            step=1.0,
+            help=t("control.peak_temp.help", locale),
+        )
+
         if is_trail_event(selected_event):
             with st.expander(t("expander.advanced_trail", locale)):
                 effort_policy = st.selectbox(
@@ -602,40 +628,14 @@ def render_general_planner(repo_root: Path) -> None:
             t("button.calculate", locale), type="primary", use_container_width=True
         )
 
-        st.markdown("---")
-        with st.expander(t("sidebar.user_guide", locale)):
-            st.markdown(t("app.how_to_use_body", locale))
-        with st.expander(t("sidebar.technical_models", locale)):
-            if locale == "fr":
-                st.markdown(
-                    "**Capacité sur Route** — Estime votre temps optimal à partir des allures LT1/LT2 "
-                    "puis ajuste selon le dénivelé et la météo.\n\n"
-                    "**Pénalité de Chaleur** — Applique une pénalité d'allure basée sur la température, "
-                    "avec une courbe diurne.\n\n"
-                    "**Durabilité** — Ralentit l'allure proportionnellement à la distance et à la durée.\n\n"
-                    "**Garde-fou FC** — Estime la FC par segment et ralentit si elle dépasse un "
-                    "plafond dynamique.\n\n"
-                    "**Nutrition** — Calcule les dépenses caloriques (~1 kcal/kg/km + coût Minetti), "
-                    "les cibles glucidiques et l'hydratation.\n\n"
-                )
-            else:
-                st.markdown(
-                    "**Road Capability** — Estimates your best-likely time from LT1/LT2 paces, "
-                    "then adjusts for course difficulty and weather.\n\n"
-                    "**Heat Penalty** — Applies a pace penalty based on temperature, with a "
-                    "diurnal curve across the event.\n\n"
-                    "**Durability** — Slows pace proportionally to distance and duration.\n\n"
-                    "**HR Guardrail** — Estimates segment HR and slows pace if it exceeds a "
-                    "dynamic ceiling.\n\n"
-                    "**Fueling** — Calculates calorie expenditure (~1 kcal/kg/km + Minetti grade cost), "
-                    "carb targets, and hydration.\n\n"
-                )
-
     if selected_course is None:
         st.error(t("msg.event_not_resolved", locale))
         return
 
     overview_course = load_course_trackpoints(selected_course)
+    aid_tier_by_distance = {
+        round(station.distance_km, 2): station.tier for station in selected_course.aid_stations
+    }
     total_gain_m, total_loss_m = elevation_changes(
         overview_course.trackpoints,
         0.0,
@@ -665,7 +665,7 @@ def render_general_planner(repo_root: Path) -> None:
             pd.DataFrame(
                 [
                     {
-                        t("col.source", locale): row["source"],
+                        t("col.source", locale): _translate_source_label(row["source"], locale),
                         t("col.best_likely", locale): format_duration_minutes(
                             float(row["time_min"]) if row["time_min"] is not None else None
                         ),
@@ -684,7 +684,7 @@ def render_general_planner(repo_root: Path) -> None:
                 t(
                     "caption.selected_source",
                     locale,
-                    source=selected_capability_source,
+                    source=_translate_source_label(selected_capability_source, locale),
                     time=format_duration_minutes(selected_capability_time_min),
                 )
             )
@@ -964,6 +964,10 @@ def render_general_planner(repo_root: Path) -> None:
                             ),
                             t("col.rest_time", locale): format_duration_minutes(
                                 aid_eta.suggested_rest_min
+                            ),
+                            t("col.tier", locale): _aid_tier_label(
+                                aid_tier_by_distance.get(round(aid_eta.distance_km, 2), "none"),
+                                locale,
                             ),
                             t("col.source", locale): aid_eta.source,
                         }
