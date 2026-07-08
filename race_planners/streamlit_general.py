@@ -19,7 +19,9 @@ from race_planners.plots import (
     plot_course_profile,
     plot_cumulative_time,
     plot_half_comparison,
+    plot_heat_impact,
     plot_pace_profile,
+    plot_temperature_curve,
     plot_terrain_breakdown,
 )
 from race_planners.plan_io import export_plan_json, load_plan_into_state
@@ -52,6 +54,7 @@ from race_planners.road_capability import (
     estimate_road_intent_target_time_min,
     road_race_distance_km,
 )
+from race_planners.weather import average_heat_multiplier_for_duration
 from race_planners.splits import (
     aggregate_split_rows,
     course_overview_rows,
@@ -1044,6 +1047,7 @@ def render_general_planner(repo_root: Path) -> None:
         st.pyplot(
             plot_course_profile(loaded_course.trackpoints, chosen_course.aid_stops_km, locale)
         )
+        st.pyplot(plot_pace_profile(result, locale))
         story_left, story_right = st.columns(2)
         with story_left:
             st.pyplot(plot_cumulative_time(result, selected_event, locale))
@@ -1061,23 +1065,41 @@ def render_general_planner(repo_root: Path) -> None:
                 st.warning(_translate_message(warning, locale))
 
         if is_road_result:
-            tab_aid, tab_splits, tab_fueling, tab_sections, tab_diagnostics, tab_snapshot = st.tabs(
+            (
+                tab_aid,
+                tab_splits,
+                tab_fueling,
+                tab_sections,
+                tab_weather,
+                tab_diagnostics,
+                tab_snapshot,
+            ) = st.tabs(
                 [
                     t("tab.aid_stations", locale),
                     t("tab.splits", locale),
                     t("tab.fueling", locale),
                     t("tab.sections", locale),
+                    t("tab.weather", locale),
                     t("tab.diagnostics", locale),
                     t("tab.snapshot", locale),
                 ]
             )
         else:
-            tab_aid, tab_sections, tab_fueling, tab_splits, tab_diagnostics, tab_snapshot = st.tabs(
+            (
+                tab_aid,
+                tab_sections,
+                tab_fueling,
+                tab_splits,
+                tab_weather,
+                tab_diagnostics,
+                tab_snapshot,
+            ) = st.tabs(
                 [
                     t("tab.aid_stations", locale),
                     t("tab.sections", locale),
                     t("tab.fueling", locale),
                     t("tab.splits", locale),
+                    t("tab.weather", locale),
                     t("tab.diagnostics", locale),
                     t("tab.snapshot", locale),
                 ]
@@ -1114,7 +1136,6 @@ def render_general_planner(repo_root: Path) -> None:
                 width="stretch",
                 hide_index=True,
             )
-            st.pyplot(plot_pace_profile(result, locale))
             if is_road_result:
                 st.pyplot(plot_half_comparison(result, locale))
                 st.pyplot(plot_terrain_breakdown(result, locale))
@@ -1184,18 +1205,6 @@ def render_general_planner(repo_root: Path) -> None:
                 st.info(t("msg.no_aid_stations", locale))
 
         with tab_sections:
-            st.markdown(t("section.section_cards", locale))
-            section_cols = st.columns(2)
-            for idx, segment in enumerate(result.segments):
-                with section_cols[idx % 2]:
-                    st.markdown(
-                        f"**{segment.section_name or segment.segment_type}**\n\n"
-                        f"{t('col.distance_km_short', locale)}: {segment.distance_km:.1f} km  \n"
-                        f"{t('section.card.terrain', locale)}: {segment.segment_type.title()}  \n"
-                        f"{t('summary.elev_gain', locale)}: +{segment.elevation_gain_m:.0f}m / -{segment.elevation_loss_m:.0f}m  \n"
-                        f"{t('section.card.pace_band', locale)}: {_pace_band_label(segment.avg_pace_min_km, average_pace_min_km, locale)}  \n"
-                        f"{t('section.pacing_cue', locale)}: {_section_cue(segment.segment_type, locale)}"
-                    )
             st.markdown(t("section.segment_pacing", locale))
             st.dataframe(
                 [
@@ -1251,10 +1260,17 @@ def render_general_planner(repo_root: Path) -> None:
                 for idx, block in enumerate(fueling_plan.blocks):
                     carry_text, station_text, fluid_text = _fueling_block_action(block, locale)
                     with fueling_cols[idx % 2]:
+                        on_site_detail = ""
+                        if block.aid_station_tier != "none":
+                            on_site_detail = (
+                                f"{t('col.on_site_kcal', locale)}: {block.on_site_kcal:.0f}  \n"
+                                f"{t('col.on_site_carb_g', locale)}: {block.on_site_carb_g:.0f}g  \n"
+                            )
                         st.markdown(
                             f"**{block.start_km:.1f}-{block.end_km:.1f} km**\n\n"
                             f"{t('fueling.action.carry', locale)}: {carry_text}  \n"
                             f"{t('fueling.action.station', locale)}: {station_text}  \n"
+                            f"{on_site_detail}"
                             f"{t('fueling.action.fluid', locale)}: {fluid_text}"
                         )
                 st.markdown(t("section.per_block_fueling", locale))
@@ -1339,6 +1355,43 @@ def render_general_planner(repo_root: Path) -> None:
                 ]
             st.dataframe(split_frame, width="stretch", hide_index=True)
 
+        with tab_weather:
+            if peak_temperature_c is not None:
+                st.markdown(t("weather.title", locale))
+                st.metric(t("weather.peak_temp", locale), f"{peak_temperature_c:.0f}°C")
+                st.markdown(f"**{t('weather.curve_title', locale)}**")
+                st.caption(t("weather.curve_caption", locale))
+                st.pyplot(
+                    plot_temperature_curve(
+                        peak_temperature_c,
+                        selected_event.start_time_local,
+                        result.total_time_min,
+                        locale,
+                    )
+                )
+                st.markdown(f"**{t('weather.impact_title', locale)}**")
+                st.caption(t("weather.impact_caption", locale))
+                st.pyplot(
+                    plot_heat_impact(
+                        peak_temperature_c,
+                        selected_event.start_time_local,
+                        result.total_time_min,
+                        result.splits,
+                        locale,
+                    )
+                )
+                avg_penalty_pct = 0.0
+                if peak_temperature_c > 10.0:
+                    avg_multiplier = average_heat_multiplier_for_duration(
+                        peak_temperature_c,
+                        selected_event.start_time_local,
+                        result.moving_time_min,
+                    )
+                    avg_penalty_pct = (avg_multiplier - 1.0) * 100.0
+                st.caption(t("weather.avg_penalty", locale, penalty=avg_penalty_pct))
+            else:
+                st.info(t("weather.no_temp", locale))
+
         with tab_snapshot:
             key_stations = result.aid_station_etas[:3]
             key_sections = sorted(
@@ -1365,8 +1418,6 @@ def render_general_planner(repo_root: Path) -> None:
                     st.markdown(
                         f"- {segment.section_name or segment.segment_type}: {_section_cue(segment.segment_type, locale)}"
                     )
-                st.markdown(f"**{t('snapshot.weather', locale)}**")
-                st.markdown(f"- {peak_temperature_c:.0f}°C")
 
         plan_json = export_plan_json(
             course_id=chosen_course.course_id,

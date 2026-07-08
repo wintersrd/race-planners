@@ -212,3 +212,55 @@ def plot_half_comparison(result: PlanResult, locale: str = "en") -> Figure:
 
     plt.tight_layout()
     return fig
+
+
+def plot_temperature_curve(
+    peak_temp_c: float,
+    start_time_local: str | None,
+    total_time_min: float,
+    locale: str = "en",
+) -> Figure:
+    from race_planners.weather import temperature_at_elapsed
+
+    hours = np.linspace(0, total_time_min / 60.0, max(int(total_time_min / 10), 20))
+    temps = [temperature_at_elapsed(peak_temp_c, hr, start_time_local) for hr in hours]
+
+    fig, ax = plt.subplots(figsize=(10, 3.5))
+    ax.plot(hours, temps, color="#E94F37", linewidth=2.5)
+    ax.fill_between(hours, temps, min(temps) - 2, color="#E94F37", alpha=0.12)
+    ax.axhline(peak_temp_c, color="#555555", linestyle="--", linewidth=0.8, alpha=0.4)
+
+    ax.set_xlabel(t("metric.elapsed", locale) + " (h)", fontsize=11)
+    ax.set_ylabel("°C", fontsize=11)
+    ax.grid(alpha=0.15)
+    plt.tight_layout()
+    return fig
+
+
+def plot_heat_impact(
+    peak_temp_c: float,
+    start_time_local: str | None,
+    total_time_min: float,
+    splits: list[Any],
+    locale: str = "en",
+) -> Figure:
+    from race_planners.weather import heat_multiplier, temperature_at_elapsed
+
+    kms = [split.km for split in splits]
+    penalties: list[float] = []
+
+    cumulative_time = 0.0
+    for split in splits:
+        elapsed_hr = cumulative_time / 60.0
+        temp_c = temperature_at_elapsed(peak_temp_c, elapsed_hr, start_time_local)
+        penalty = (heat_multiplier(temp_c) - 1.0) * 100.0
+        penalties.append(max(penalty, 0.0))
+        cumulative_time = split.cumulative_time_min
+
+    fig, ax = plt.subplots(figsize=(10, 3.5))
+    ax.bar(kms, penalties, width=0.85, color="#E94F37", alpha=0.7, edgecolor="white", linewidth=0.3)
+    ax.set_xlabel(t("overview.distance", locale) + " (km)", fontsize=11)
+    ax.set_ylabel("%", fontsize=11)
+    ax.grid(axis="y", alpha=0.15)
+    plt.tight_layout()
+    return fig
