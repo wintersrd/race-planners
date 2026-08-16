@@ -1,6 +1,7 @@
 # race-planners
 
-Race planning applications and tools, currently focused on a Streamlit app for the Semi-Marathon du Finistere.
+Race planning applications and tools, centered on a single Streamlit-based
+unified event planner.
 
 ## Python and environment
 
@@ -23,6 +24,20 @@ Run Streamlit from repository root so path behavior matches Streamlit Community 
 uv run streamlit run semi-marathon-finistere/app.py
 ```
 
+Do not start the app with `uv run semi-marathon-finistere/app.py` as a normal Python script. This repository's app is a Streamlit entrypoint, not a plain CLI program.
+
+If you do run the script directly, it now re-launches itself through Streamlit, but the supported command is still the `streamlit run` form above.
+
+The active app now presents one event-first planning flow:
+
+- curated events currently include Finistere half marathon plus GRF56, GRF92,
+  and GRF166
+- race models currently include `half_marathon`, `road_marathon`,
+  `fire_road_ultra`, and `technical_trail_ultra`
+- input modes supported across the unified planner are `finish_time` and
+  `effort_anchor`
+- plan persistence is available through JSON download/reload
+
 ## Quality commands
 
 ```bash
@@ -43,6 +58,14 @@ scripts/check_streamlit_requirements.sh
 ```
 
 Do not hand-edit `semi-marathon-finistere/requirements.txt`.
+
+## Repository conventions for courses and plans
+
+- Local route library root: `courses/`
+- Plan files are JSON exports from the app and can reference repository-backed
+  GPX filenames
+- If a referenced curated GPX is missing on reload, restore the file in the
+  repository before retrying
 
 ## Devcontainer
 

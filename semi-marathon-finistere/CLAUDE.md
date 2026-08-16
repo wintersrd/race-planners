@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A bilingual (English/French) Streamlit web application for race pacing strategy. Uses Grade-Adjusted Pace (GAP) to calculate realistic pace targets for the Semi-Marathon du Finistère half marathon (21.1 km, ~153m elevation gain).
+A bilingual (English/French) Streamlit web application for race pacing, fueling, and timing strategy. Supports road events (half marathon, marathon) and trail/ultra events via a unified event-first planner.
 
 ## Commands
 
@@ -24,38 +24,48 @@ scripts/export_streamlit_requirements.sh
 
 ## Architecture
 
-Single-file Streamlit app (`app.py`) with these key sections:
+The entry point is `semi-marathon-finistere/app.py`, a thin wrapper that delegates to the unified planner in `race_planners/streamlit_general.py`.
 
-### Data Layer
-- **GPX Parsing**: `parse_gpx()` reads course data from `WR-GPX-Semi-marathon-du-Finistere.gpx`
-- **TrackPoint dataclass**: Stores lat, lon, elevation, distance_from_start, grade_percent
-- **Caching**: `@st.cache_data` on `load_gpx_data()` for performance
+### Core Modules
 
-### Core Algorithms
-- **GAP Factor**: `gap_factor(grade_percent)` - polynomial formula for grade-adjusted pacing
-- **Elevation Segments**: `detect_elevation_segments()` - state machine with rolling window to classify climbs/descents/flats
-- **Pacing Calculator**: `calculate_pacing()` - distributes target time across kilometers with GAP adjustment
-
-### UI Structure (5 tabs)
-1. Summary - strategy overview, split analysis, pace chart
-2. Course Sections - predefined sections with pacing tips (COURSE_SECTIONS constant)
-3. Elevation Segments - algorithm-detected segments with configurable thresholds
-4. Tables - rest stops and kilometer splits
-5. Print/Export - pocket card and wristband downloads
+- `race_planners/streamlit_general.py` — Streamlit UI orchestration
+- `race_planners/planner.py` — Main plan calculation engine
+- `race_planners/i18n.py` — Bilingual translation infrastructure (`TRANSLATIONS` dict + `t()` function)
+- `race_planners/road_capability.py` — Road best-likely solver and feasibility classifiers
+- `race_planners/weather.py` — Heat penalty and diurnal temperature model
+- `race_planners/fatigue.py` — Fatigue, fade, and durability multipliers
+- `race_planners/guardrails.py` — HR guardrail and effort policy logic
+- `race_planners/fueling.py` — Energy expenditure, carb/hydration, and fueling plan
+- `race_planners/segments.py` — Aid-aware segment builder
+- `race_planners/profile.py` — Athlete profile defaults and preset definitions
+- `race_planners/splits.py` — Course overview and split aggregation
+- `race_planners/formatting.py` — Pace, duration, and clock formatting (locale-aware)
+- `race_planners/plots.py` — Matplotlib chart helpers
+- `race_planners/grade.py` — GPX parsing, elevation, and GAP calculations
+- `race_planners/models.py` — Dataclasses (Course, PacingConfig, PlanResult, etc.)
+- `race_planners/event_catalog.py` — Curated event definitions
+- `race_planners/course_library.py` — Course loading from GPX files
+- `race_planners/plan_io.py` — Plan JSON export/import
 
 ### Internationalization
-- `TRANSLATIONS` dict contains all UI strings in English ('en') and French ('fr')
-- `t(key, lang)` function retrieves translated strings
-- All display text must go through translations
 
-## Key Constants
-- `REST_STOPS = [5.3, 9.1, 14.5]` - water station distances in km
-- `COURSE_SECTIONS` - predefined course segments with strategy tips
-- `SMOOTHING_WINDOW = 5` - elevation smoothing factor
+- `race_planners/i18n.py` contains the `TRANSLATIONS` dict with all UI strings keyed by dot-notation identifiers
+- `t(key, locale, **kwargs)` retrieves translated strings with named-placeholder interpolation
+- The domain layer (planner, fueling, road_capability) emits i18n **keys** (not translated text)
+- The UI boundary translates keys at render time using `t()`
+- Assumption/warning keys may include inline kwargs: `"assumption.weather_heat|temp=30"`
 
-## Data Flow
-1. GPX file loaded once (cached)
-2. User inputs: target time/pace, power fade, rest duration, segment thresholds
-3. `calculate_pacing()` generates km_splits and rest_stops data
-4. `detect_elevation_segments()` creates elevation-based segments
-5. Tabs display different views of the same pacing data
+### Key Data Flow
+
+1. User selects a curated event from the sidebar
+2. Event catalog resolves the course, model, and defaults
+3. GPX is parsed into trackpoints with elevation and distance
+4. User configures target mode (finish time or effort anchor) and strategy controls
+5. `calculate_plan()` runs the pacing simulation with fatigue, fade, weather, and guardrail multipliers
+6. Results render across tabs: Summary, Course Profile, Aid Stations, Sections, Fueling, Splits
+
+### Locale
+
+- `st.session_state["general_locale"]` stores the active locale (`"en"` or `"fr"`)
+- Set via a sidebar radio at the top of `render_general_planner()`
+- Clock formatting switches between 12-hour (English) and 24-hour (French) via `format_clock_time(time, event, locale)`

@@ -1,0 +1,20 @@
+- generic [ref=e3]:
+  - banner [ref=e6]:
+    - generic [ref=e9]:
+      - button "Deploy" [ref=e11] [cursor=pointer]:
+        - generic [ref=e13]: Deploy
+      - button "Main menu" [ref=e15] [cursor=pointer]:
+        - img [ref=e16]
+  - alert [ref=e22]:
+    - generic [ref=e25]:
+      - generic [ref=e26]: "ModuleNotFoundError: No module named 'race_planners'"
+      - generic [ref=e27]:
+        - generic [ref=e28]: "Traceback:"
+        - code [ref=e31]:
+          - generic [ref=e32]: File "/home/robwinters/repositories/race-planners/semi-marathon-finistere/app.py", line 20, in <module> from race_planners.streamlit_general import render_general_planner
+      - generic [ref=e33]:
+        - button "Copy" [active] [ref=e34] [cursor=pointer]
+        - link "Ask Google" [ref=e35] [cursor=pointer]:
+          - /url: https://www.google.com/search?q=ModuleNotFoundError%3A%20No%20module%20named%20'race_planners'
+        - link "Ask ChatGPT" [ref=e36] [cursor=pointer]:
+          - /url: https://chatgpt.com/?q=ModuleNotFoundError%3A%20No%20module%20named%20'race_planners'%0A%0AFile%20%22%2Fhome%2Frobwinters%2Frepositories%2Frace-planners%2Fsemi-marathon-finistere%2Fapp.py%22%2C%20line%2020%2C%20in%20%3Cmodule%3E%0A%20%20%20%20from%20race_planners.streamlit_general%20import%20render_general_planner
