@@ -25,6 +25,7 @@ def get_builtin_courses(repo_root: Path) -> list[Course]:
                 terrain=event.terrain,
                 event_id=event.event_id,
                 template_id=event.template_id,
+                time_gates=list(event.time_gates),
             )
         )
     return courses

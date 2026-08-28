@@ -28,11 +28,18 @@ from race_planners.models import (
     AidStationEta,
     AidStation,
     Course,
+    GateCheck,
     LoadedCourse,
     PaceSplit,
     PacingConfig,
     PlanResult,
+    TimeGate,
     TrackPoint,
+)
+from race_planners.time_gates import (
+    attach_gates_to_stations,
+    evaluate_time_gates,
+    gate_warning_codes,
 )
 from race_planners.pacing import (
     FireRoadUltraModel,
@@ -326,10 +333,29 @@ def _simulate_total_time(
     return cumulative_time
 
 
+def _elapsed_at_km(splits: list[PaceSplit], km: float) -> float:
+    """Interpolate cumulative moving time at an arbitrary kilometre."""
+    elapsed = 0.0
+    prev_km = 0.0
+    for split in splits:
+        split_end = split.km
+        if km <= split_end:
+            split_length = split_end - prev_km
+            fraction = (km - prev_km) / split_length if split_length > 0 else 0.0
+            return elapsed + split.segment_time_min * fraction
+        elapsed += split.segment_time_min
+        prev_km = split_end
+    return elapsed
+
+
 def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanResult:
     trackpoints = loaded_course.trackpoints
     total_distance_km = loaded_course.total_distance_km
     valid_aid_stations = _valid_aid_stations(loaded_course.course, total_distance_km)
+    time_gates = list(loaded_course.course.time_gates)
+    valid_aid_stations, unmatched_station_gates = attach_gates_to_stations(
+        valid_aid_stations, time_gates
+    )
     config = _normalize_config(
         config,
         trackpoints,
@@ -395,27 +421,16 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
 
     aid_arrival_times: list[float] = []
     aid_station_etas: list[AidStationEta] = []
+    gate_arrival_pairs: list[tuple[TimeGate, float]] = []
     cumulative_rest_min = 0.0
     for aid_station in valid_aid_stations:
         aid_km = aid_station.distance_km
         prev_station_km = aid_station_etas[-1].distance_km if aid_station_etas else 0.0
-        elapsed = 0.0
-        prev_km = 0.0
-        for split in splits:
-            split_end = split.km
-            if aid_km <= split_end:
-                split_length = split_end - prev_km
-                if split_length > 0:
-                    fraction = (aid_km - prev_km) / split_length
-                else:
-                    fraction = 0.0
-                elapsed += split.segment_time_min * fraction
-                break
-            elapsed += split.segment_time_min
-            prev_km = split_end
+        elapsed = _elapsed_at_km(splits, aid_km)
         aid_arrival_times.append(elapsed)
         station_rest_min = _rest_duration_sec_for_station(config, aid_station) / 60.0
         prior_rest_time_min = cumulative_rest_min
+        arrival_elapsed_min = elapsed + prior_rest_time_min
         split_distance_km = aid_km - prev_station_km
         split_from_prev_min = elapsed - (
             aid_station_etas[-1].arrival_moving_time_min if aid_station_etas else 0.0
@@ -426,6 +441,10 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         block_gain_m, block_loss_m = elevation_changes(
             trackpoints, prev_station_km * 1000, aid_km * 1000
         )
+        gate = aid_station.time_gate
+        barrier_time_local = gate.barrier_time_local if gate is not None else None
+        if gate is not None and config.event_start_time_local is not None:
+            gate_arrival_pairs.append((gate, arrival_elapsed_min))
         cumulative_rest_min += station_rest_min
         aid_station_etas.append(
             AidStationEta(
@@ -434,14 +453,15 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
                 source=aid_station.source,
                 waypoint_type=aid_station.waypoint_type,
                 arrival_moving_time_min=elapsed,
-                arrival_elapsed_time_min=elapsed + prior_rest_time_min,
-                departure_elapsed_time_min=elapsed + prior_rest_time_min + station_rest_min,
+                arrival_elapsed_time_min=arrival_elapsed_min,
+                departure_elapsed_time_min=arrival_elapsed_min + station_rest_min,
                 split_from_prev_min=split_from_prev_min,
                 split_distance_km=split_distance_km,
                 actual_pace_min_km=actual_pace_min_km,
                 suggested_rest_min=station_rest_min,
                 elevation_gain_m=round(block_gain_m, 1),
                 elevation_loss_m=round(block_loss_m, 1),
+                barrier_time_local=barrier_time_local,
             )
         )
 
@@ -469,6 +489,42 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
     if config.peak_temperature_c is not None and config.peak_temperature_c > 10.0:
         assumptions.append(f"assumption.weather_heat|temp={config.peak_temperature_c:.0f}")
 
+    gate_checks: list[GateCheck] = []
+    if time_gates:
+        start_time_local = config.event_start_time_local
+        if start_time_local is None:
+            warnings.append("warning.gate_start_time_missing")
+        else:
+            for gate in unmatched_station_gates:
+                gate_km = gate.distance_km
+                if gate_km is None:
+                    continue
+                prior_rest_min = sum(
+                    eta.suggested_rest_min for eta in aid_station_etas if eta.distance_km < gate_km
+                )
+                gate_arrival_pairs.append((gate, _elapsed_at_km(splits, gate_km) + prior_rest_min))
+            finish_time_min = cumulative_time + cumulative_rest_min
+            gate_arrival_pairs.extend(
+                (gate, finish_time_min) for gate in time_gates if gate.distance_km is None
+            )
+            gate_arrival_pairs.sort(
+                key=lambda pair: (
+                    pair[0].distance_km is None,
+                    pair[0].distance_km if pair[0].distance_km is not None else 0.0,
+                )
+            )
+            gate_checks = evaluate_time_gates(gate_arrival_pairs, start_time_local)
+            buffer_by_gate = {
+                id(gate): check.buffer_min
+                for (gate, _), check in zip(gate_arrival_pairs, gate_checks, strict=True)
+            }
+            for aid_station, eta in zip(valid_aid_stations, aid_station_etas, strict=True):
+                gate = aid_station.time_gate
+                if gate is not None:
+                    eta.arrival_buffer_min = buffer_by_gate.get(id(gate))
+            assumptions.append("assumption.time_gates")
+            warnings.extend(gate_warning_codes(gate_checks))
+
     return PlanResult(
         splits=splits,
         segments=build_segment_summaries(
@@ -485,6 +541,7 @@ def calculate_plan(loaded_course: LoadedCourse, config: PacingConfig) -> PlanRes
         total_distance_km=total_distance_km,
         assumptions=assumptions,
         warnings=warnings,
+        gate_checks=gate_checks,
     )
 
 

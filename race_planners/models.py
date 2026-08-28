@@ -15,12 +15,20 @@ class TrackPoint:
 
 
 @dataclass(frozen=True)
+class TimeGate:
+    label: str
+    barrier_time_local: str
+    distance_km: float | None = None
+
+
+@dataclass(frozen=True)
 class AidStation:
     distance_km: float
     label: str = ""
     source: str = "config"
     waypoint_type: str = ""
     tier: str = "standard"
+    time_gate: TimeGate | None = None
 
 
 @dataclass
@@ -33,6 +41,7 @@ class Course:
     terrain: str = "road"
     event_id: str | None = None
     template_id: str | None = None
+    time_gates: list[TimeGate] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if self.aid_stations and not self.aid_stops_km:
@@ -76,6 +85,7 @@ class CuratedEvent:
     terrain: str
     aid_stops_km: list[float] = field(default_factory=list)
     aid_station_tiers: dict[float, str] = field(default_factory=dict)
+    time_gates: list[TimeGate] = field(default_factory=list)
     default_input_mode: str = "finish_time"
     start_time_local: str | None = None
     baseline_peak_temp_c: float | None = None
@@ -189,6 +199,19 @@ class AidStationEta:
     suggested_rest_min: float = 0.0
     elevation_gain_m: float = 0.0
     elevation_loss_m: float = 0.0
+    barrier_time_local: str | None = None
+    arrival_buffer_min: float | None = None
+
+
+@dataclass(frozen=True)
+class GateCheck:
+    label: str
+    distance_km: float | None
+    barrier_time_local: str
+    deadline_elapsed_min: float
+    arrival_elapsed_min: float
+    buffer_min: float
+    missed: bool
 
 
 @dataclass
@@ -203,6 +226,7 @@ class PlanResult:
     total_distance_km: float
     assumptions: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    gate_checks: list[GateCheck] = field(default_factory=list)
 
 
 @dataclass

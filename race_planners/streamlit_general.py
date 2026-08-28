@@ -10,11 +10,17 @@ import streamlit as st
 
 from race_planners.course_library import get_course_by_id
 from race_planners.event_catalog import list_curated_events
-from race_planners.formatting import format_clock_time, format_duration_minutes, format_pace_minutes
+from race_planners.formatting import (
+    format_clock_time,
+    format_duration_minutes,
+    format_pace_minutes,
+    format_signed_duration_minutes,
+)
 from race_planners.fueling import build_fueling_plan
 from race_planners.grade import elevation_changes
 from race_planners.i18n import AVAILABLE_LOCALES, DEFAULT_LOCALE, t
 from race_planners.models import CuratedEvent, PacingConfig
+from race_planners.time_gates import TIGHT_GATE_BUFFER_MIN
 from race_planners.plots import (
     plot_course_profile,
     plot_cumulative_time,
@@ -75,14 +81,14 @@ def _translate_message(message: str, locale: str) -> str:
     """
     if "|" in message:
         key, args_str = message.split("|", 1)
-        kwargs: dict[str, float] = {}
+        kwargs: dict[str, object] = {}
         for pair in args_str.split(","):
             if "=" in pair:
                 k, v = pair.split("=", 1)
                 try:
                     kwargs[k.strip()] = float(v.strip())
                 except ValueError:
-                    kwargs[k.strip()] = 0.0
+                    kwargs[k.strip()] = v.strip()
         return t(key, locale, **kwargs)
     return t(message, locale)
 
@@ -1109,7 +1115,43 @@ def render_general_planner(repo_root: Path) -> None:
             st.caption(t("caption.assumptions", locale, assumptions=" | ".join(translated)))
         if result.warnings:
             for warning in result.warnings:
+                if result.gate_checks and warning.startswith("warning.gate_"):
+                    continue
                 st.warning(_translate_message(warning, locale))
+
+        if result.gate_checks:
+            st.markdown(t("section.time_gates", locale))
+            for check in result.gate_checks:
+                if check.distance_km is None:
+                    location = check.label or t("gates.finish_label", locale)
+                elif check.label:
+                    location = f"{check.label} (km {check.distance_km:.1f})"
+                else:
+                    location = f"km {check.distance_km:.1f}"
+                row = t(
+                    "gates.row",
+                    locale,
+                    barrier=check.barrier_time_local,
+                    arrival=format_clock_time(selected_event, check.arrival_elapsed_min, locale),
+                    buffer=format_signed_duration_minutes(check.buffer_min),
+                )
+                line = f"**{location}** — {row}"
+                if check.missed:
+                    st.error(line)
+                elif check.buffer_min < TIGHT_GATE_BUFFER_MIN:
+                    st.warning(f"{line} — {t('gates.tight_note', locale)}")
+                else:
+                    st.success(line)
+            tightest = min(result.gate_checks, key=lambda check: check.buffer_min)
+            if not tightest.missed:
+                st.info(
+                    t(
+                        "gates.tightest",
+                        locale,
+                        label=tightest.label or t("gates.finish_label", locale),
+                        buffer=format_signed_duration_minutes(tightest.buffer_min),
+                    )
+                )
 
         if is_road_result:
             (
@@ -1202,7 +1244,13 @@ def render_general_planner(repo_root: Path) -> None:
                             f"{t('col.distance_km', locale)}: {aid_eta.distance_km:.1f} km  \n"
                             f"{t('col.arrival_clock', locale)}: {format_clock_time(selected_event, aid_eta.arrival_elapsed_time_min, locale)}  \n"
                             f"{t('col.departure_clock', locale)}: {format_clock_time(selected_event, aid_eta.departure_elapsed_time_min, locale)}  \n"
-                            f"{t('col.tier', locale)}: {_aid_tier_label(tier, locale)}  \n"
+                            + (
+                                f"{t('col.barrier', locale)}: {aid_eta.barrier_time_local}  \n"
+                                f"{t('col.buffer', locale)}: {format_signed_duration_minutes(aid_eta.arrival_buffer_min)}  \n"
+                                if aid_eta.barrier_time_local is not None
+                                else ""
+                            )
+                            + f"{t('col.tier', locale)}: {_aid_tier_label(tier, locale)}  \n"
                             f"{_aid_station_action(tier, locale)}"
                         )
                 st.markdown(t("section.aid_timing", locale))
@@ -1240,6 +1288,12 @@ def render_general_planner(repo_root: Path) -> None:
                             t("col.rest_time", locale): format_duration_minutes(
                                 aid_eta.suggested_rest_min
                             ),
+                            t("col.barrier", locale): aid_eta.barrier_time_local or "",
+                            t("col.buffer", locale): format_signed_duration_minutes(
+                                aid_eta.arrival_buffer_min
+                            )
+                            if aid_eta.barrier_time_local is not None
+                            else "",
                             t("col.tier", locale): _aid_tier_label(
                                 aid_tier_by_distance.get(round(aid_eta.distance_km, 2), "none"),
                                 locale,

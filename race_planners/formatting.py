@@ -24,6 +24,19 @@ def format_duration_minutes(minutes: float | None) -> str:
     return f"{mins}:{secs:02d}"
 
 
+def format_signed_duration_minutes(minutes: float | None) -> str:
+    """Format a signed duration like ``+0:45`` or ``-0:12`` (minus sign)."""
+    if minutes is None:
+        return "-"
+    sign = "−" if minutes < 0 else "+"
+    total_seconds = abs(int(round(minutes * 60)))
+    hours, remainder = divmod(total_seconds, 3600)
+    mins, secs = divmod(remainder, 60)
+    if hours > 0:
+        return f"{sign}{hours}:{mins:02d}:{secs:02d}"
+    return f"{sign}{mins}:{secs:02d}"
+
+
 def start_datetime(event: CuratedEvent) -> datetime | None:
     if event.start_time_local is None:
         return None

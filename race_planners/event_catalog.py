@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from race_planners.models import CuratedEvent, EventTemplate
+from race_planners.models import CuratedEvent, EventTemplate, TimeGate
 
 
 _EVENT_TEMPLATES: tuple[EventTemplate, ...] = (
@@ -84,6 +84,10 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             start_time_local="12:30",
             baseline_peak_temp_c=18.0,
             event_month=9,  # September
+            time_gates=[
+                TimeGate(label="L'aber", barrier_time_local="22:15", distance_km=47),
+                TimeGate(label="Arrivée Telgruc", barrier_time_local="23:59"),
+            ],
         ),
         CuratedEvent(
             event_id="grf92",
@@ -106,6 +110,12 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             start_time_local="06:30",
             baseline_peak_temp_c=20.0,
             event_month=9,  # September
+            time_gates=[
+                TimeGate(label="Camaret", barrier_time_local="13:00", distance_km=37),
+                TimeGate(label="Saint-Hernot", barrier_time_local="20:00", distance_km=70),
+                TimeGate(label="L'aber", barrier_time_local="22:15", distance_km=83),
+                TimeGate(label="Arrivée Telgruc", barrier_time_local="23:59"),
+            ],
         ),
         CuratedEvent(
             event_id="grf166",
@@ -132,6 +142,14 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             start_time_local="17:00",
             baseline_peak_temp_c=20.0,
             event_month=9,  # September
+            time_gates=[
+                TimeGate(label="Trégarvan", barrier_time_local="23:30", distance_km=38),
+                TimeGate(label="Lanvéoc", barrier_time_local="07:00", distance_km=74),
+                TimeGate(label="Camaret", barrier_time_local="13:00", distance_km=112),
+                TimeGate(label="Saint-Hernot", barrier_time_local="20:00", distance_km=146.9),
+                TimeGate(label="L'aber", barrier_time_local="22:15", distance_km=159.5),
+                TimeGate(label="Arrivée Telgruc", barrier_time_local="23:59"),
+            ],
         ),
         CuratedEvent(
             event_id="marathon-etoiles-baie",

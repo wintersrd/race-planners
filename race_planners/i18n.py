@@ -232,6 +232,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "col.split_time": "Split",
         "col.split_pace": "Pace",
         "col.rest_time": "Rest",
+        "col.barrier": "Barrier",
+        "col.buffer": "Buffer",
         "msg.no_aid_stations": "No in-range aid stations were available for this course.",
         # ── Sections tab ─────────────────────────────────────────────
         "section.segment_pacing": "#### Segment pacing",
@@ -402,6 +404,17 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # ── Fueling warnings (emitted as keys) ───────────────────────
         "warning.carb_deficit": "Planned carb intake falls {deficit:.0f}g short of target. Consider increasing fueling frequency.",
         "warning.gut_stress": "Late-race gut stress may reduce absorption by 30-50%. Consider front-loading carb intake.",
+        # ── Time gates ───────────────────────────────────────────────
+        "section.time_gates": "### Time Gates",
+        "gates.finish_label": "Finish",
+        "gates.tightest": "Tightest gate: **{label}** with {buffer} of margin.",
+        "gates.row": "Barrier {barrier} — projected arrival {arrival} ({buffer})",
+        "gates.tight_note": "tight: less than 30 minutes of margin",
+        # ── Domain-layer gate codes ──────────────────────────────────
+        "warning.gate_missed": "Projected arrival at {label} misses the barrier cutoff (buffer {buffer:.0f} min). Adjust pace or rest stops.",
+        "warning.gate_tight": "Time buffer at {label} is only {buffer:.0f} min. A single long stop could miss this barrier.",
+        "warning.gate_start_time_missing": "This event has time gates but no start time is set; gate checks were skipped.",
+        "assumption.time_gates": "Time gates (barrières horaires) are checked against projected arrival times.",
     },
     "fr": {
         # ── Page chrome ──────────────────────────────────────────────
@@ -624,6 +637,8 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         "col.split_time": "Intervalle",
         "col.split_pace": "Allure",
         "col.rest_time": "Arrêt",
+        "col.barrier": "Barrière",
+        "col.buffer": "Marge",
         "msg.no_aid_stations": "Aucune station de ravitaillement valide sur ce parcours.",
         # ── Sections tab ─────────────────────────────────────────────
         "section.segment_pacing": "#### Allure par Section",
@@ -794,6 +809,17 @@ TRANSLATIONS: dict[str, dict[str, str]] = {
         # ── Fueling warnings ────────────────────────────────────────
         "warning.carb_deficit": "Apport glucidique prévu inférieur de {deficit:.0f}g à la cible. Envisagez d'augmenter la fréquence nutritionnelle.",
         "warning.gut_stress": "Le stress intestinal en fin de course peut réduire l'absorption de 30-50%. Envisagez d'avancer la prise de glucides.",
+        # ── Time gates ───────────────────────────────────────────────
+        "section.time_gates": "### Barrières Horaires",
+        "gates.finish_label": "Arrivée",
+        "gates.tightest": "Barrière la plus serrée : **{label}** avec {buffer} de marge.",
+        "gates.row": "Barrière {barrier} — arrivée projetée {arrival} ({buffer})",
+        "gates.tight_note": "serré : moins de 30 minutes de marge",
+        # ── Domain-layer gate codes ──────────────────────────────────
+        "warning.gate_missed": "L'arrivée projetée à {label} dépasse la barrière horaire (marge {buffer:.0f} min). Ajustez l'allure ou les arrêts.",
+        "warning.gate_tight": "La marge horaire à {label} n'est que de {buffer:.0f} min. Un seul arrêt long pourrait faire manquer cette barrière.",
+        "warning.gate_start_time_missing": "Cette épreuve comporte des barrières horaires mais aucune heure de départ n'est définie ; les contrôles ont été ignorés.",
+        "assumption.time_gates": "Les barrières horaires sont comparées aux temps de passage projetés.",
     },
 }
 

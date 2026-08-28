@@ -65,6 +65,26 @@ def test_get_builtin_courses_uses_curated_event_catalog(tmp_path: Path) -> None:
     assert all(s.tier == "water_only" for s in grf56.aid_stations)
 
 
+def test_get_builtin_courses_propagates_time_gates(tmp_path: Path) -> None:
+    course_dir = tmp_path / "semi-marathon-finistere"
+    course_dir.mkdir()
+    (course_dir / "semi-marathon-du-finistere.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+    (course_dir / "2026-grf166.gpx").write_text("<gpx></gpx>", encoding="utf-8")
+
+    courses = get_builtin_courses(tmp_path)
+    by_id = {course.course_id: course for course in courses}
+
+    assert [gate.label for gate in by_id["grf166"].time_gates] == [
+        "Trégarvan",
+        "Lanvéoc",
+        "Camaret",
+        "Saint-Hernot",
+        "L'aber",
+        "Arrivée Telgruc",
+    ]
+    assert by_id["semi-marathon-finistere"].time_gates == []
+
+
 def test_save_uploaded_gpx_avoids_collisions(tmp_path: Path) -> None:
     upload_dir = tmp_path / "courses" / "uploads"
 
