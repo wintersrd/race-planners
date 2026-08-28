@@ -1,7 +1,7 @@
 # Unified Event Planner Research Notes
 
 Date: 2026-07-02
-Status: Discovery complete, implementation not yet started
+Status: Historical discovery record. The unified package architecture described below is now implemented.
 
 ## Why this note exists
 
@@ -11,12 +11,12 @@ handoff artifact for future implementation work.
 
 ## Current app split
 
-The repository currently contains two planner experiences mounted inside the
-same Streamlit app.
+This section records the pre-consolidation state, when the repository contained
+two planner experiences.
 
 ### Legacy planner path
 
-- Entry point: `semi-marathon-finistere/app.py`
+- Former entrypoint: a now-removed legacy shell
 - UI mode key: `legacy_half_marathon`
 - Characteristics:
   - polished single-race UX
@@ -42,14 +42,9 @@ different planner applications sharing only part of the underlying logic.
 
 ## Relevant code locations
 
-### Legacy app and inline logic
+### Former legacy app and inline logic
 
-- `semi-marathon-finistere/app.py`
-  - Streamlit shell
-  - legacy GPX loading
-  - legacy pacing calculations
-  - legacy elevation segmentation
-  - legacy split tables, charts, pacing tips, rest-stop reporting
+- The removed legacy shell was replaced by `race_planners/app.py`.
 
 ### Reusable package modules
 
@@ -112,10 +107,7 @@ This means feature parity cannot be achieved by a small UI patch.
 
 Examples:
 
-- GPX parsing exists inline in `semi-marathon-finistere/app.py`
-- GPX parsing also exists in `race_planners/grade.py`
-- the same GAP concept exists in both code paths
-- segment concepts exist in both, but not in the same representation
+- GPX parsing is now owned by `race_planners/grade.py`.
 
 ### 3. Data shapes differ across the two systems
 
@@ -167,36 +159,14 @@ That is not enough for a curated event-first product. Missing examples include:
 
 ### Built-in courses
 
-Only one built-in course is hardcoded today:
+The package now exposes a curated event catalog and package-owned GPX assets.
 
-- `semi-marathon-finistere`
-
-It points at the Finistere half-marathon GPX and explicit aid-stop distances.
-
-### Auto-discovered courses
-
-`list_courses()` scans GPX files under `courses/**.gpx` and combines them with
-the built-in course list.
-
-### Important limitation
-
-GPX files placed directly under `semi-marathon-finistere/` are not automatically
-discoverable by the general planner, except for the one hardcoded built-in
-entry.
-
-### Uploaded GPX behavior
-
-The general planner currently supports uploaded GPX files stored under
-`courses/uploads/`.
-
-This matters because the new merged direction explicitly excludes custom GPX
-upload for the curated event-first experience. Existing upload code is therefore
-legacy-to-beta infrastructure, not a required product feature for the next
-merged milestone.
+Custom GPX discovery, upload, and persistence were removed. Curated assets live
+under `race_planners/data/courses/`.
 
 ## GPX findings for GRF events
 
-The following GPX files were added under `semi-marathon-finistere/`:
+The following GPX files are bundled under `race_planners/data/courses/`:
 
 - `2026-grf56.gpx`
 - `2026-grf92.gpx`

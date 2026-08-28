@@ -18,27 +18,15 @@ dev = [
   "pytest>=8.4.0",
   "ruff>=0.11.0",
 ]
-notebook = [
-  "ipywidgets>=8.1.0",
-  "voila>=0.5.0",
-]
-
 [tool.ruff]
 line-length = 100
 target-version = "py313"
-extend-exclude = [
-  "semi-marathon-finistere/app.py",
-  "semi-marathon-finistere/race_planner_semi_marathon_finistere.ipynb",
-]
 
 [tool.mypy]
 python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
-exclude = [
-  "semi-marathon-finistere/app.py",
-]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-EXPECTED_FILE="${ROOT_DIR}/semi-marathon-finistere/requirements.txt"
+EXPECTED_FILE="${ROOT_DIR}/race_planners/requirements.txt"
 TMP_FILE="$(mktemp)"
 
 cleanup() {

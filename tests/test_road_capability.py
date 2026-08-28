@@ -45,8 +45,8 @@ def test_road_best_likely_solver_returns_more_conservative_marathon_than_half() 
 
 
 def test_road_adjusted_best_likely_slows_with_heat_and_hills() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "marathon-etoiles-baie")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("marathon-etoiles-baie")
     loaded = load_course_trackpoints(course)
 
     adjusted = estimate_road_adjusted_best_likely(
@@ -64,8 +64,8 @@ def test_road_adjusted_best_likely_slows_with_heat_and_hills() -> None:
 
 
 def test_road_adjusted_best_likely_respects_tolerance_modifiers() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "marathon-etoiles-baie")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("marathon-etoiles-baie")
     loaded = load_course_trackpoints(course)
 
     tolerant = estimate_road_adjusted_best_likely(

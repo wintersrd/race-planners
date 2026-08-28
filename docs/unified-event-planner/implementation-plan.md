@@ -1,14 +1,14 @@
 # Unified Event Planner Implementation Plan
 
 Date: 2026-07-02
-Status: In progress
+Status: Historical implementation record. Superseded by the package consolidation completed in August 2026.
 
 ## Progress Log
 
 ### 2026-07-02
 
 - Completed checkpoint commit of the pre-build groundwork and removed the tracked
-  `semi-marathon-finistere/__pycache__/app.cpython-313.pyc` file from git so
+  obsolete app cache file from git so
   `pytest` hook runs stop dirtying the index during commits.
 - Phase 1 completed:
   - added canonical curated event and event-template models
@@ -69,7 +69,7 @@ Status: In progress
     labels
   - added regression coverage for aid-boundary-aware segment generation
 - Phase 7 completed:
-  - removed the top-level planner-mode switch from `semi-marathon-finistere/app.py`
+  - removed the top-level planner-mode switch from the Streamlit entrypoint
     so the app now enters directly into the unified event-first planner flow
   - renamed the planner shell from a beta/general planner framing to the
     canonical unified event planner experience
@@ -83,10 +83,8 @@ Status: In progress
 - Phase 8 completed:
   - cleaned repository-facing README text so the project no longer describes the
     removed two-planner split as the active product model
-  - updated the `semi-marathon-finistere` app entry metadata and local README to
-    describe the unified planner as the active Streamlit experience while
-    clarifying that legacy notebook/app logic remains for compatibility and
-    regression coverage
+  - updated the Streamlit entry metadata and repository README to describe the
+    unified planner as the active experience
   - removed remaining active-product references to GPX re-upload guidance in the
     main README in favor of repository-backed curated course restoration wording
 - Post-phase regression remediation completed:
@@ -242,7 +240,7 @@ instead of polishing the wrong abstraction.
 
 ### Tasks
 
-- keep the current startup fix in place for `semi-marathon-finistere/app.py`
+- keep the startup behavior in `race_planners/app.py`
 - add or extend tests around current course parsing and legacy outputs where
   upcoming refactors would otherwise be risky
 - identify a minimal golden-path regression for Finistere half-marathon output
@@ -268,7 +266,7 @@ instead of polishing the wrong abstraction.
   - GRF56
   - GRF92
   - GRF166
-- include repository-relative GPX references and template mapping
+- include package-owned curated GPX references and template mapping
 - support aid-station override metadata in catalog definitions
 
 ### Likely code areas
@@ -303,7 +301,7 @@ instead of polishing the wrong abstraction.
 - `race_planners/grade.py`
 - `race_planners/course_library.py`
 - `race_planners/models.py`
-- removal or reduction of duplicated parser logic in `semi-marathon-finistere/app.py`
+- keep GPX parsing in the shared package parser
 
 ### Exit criteria
 

@@ -49,8 +49,8 @@ def test_segment_summary_respects_aid_station_boundaries() -> None:
 
 
 def test_climb_hike_threshold_meaningfully_changes_grf92_finish_time() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "grf92")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("grf92")
     loaded = load_course_trackpoints(course)
 
     low_threshold = calculate_plan(
@@ -81,8 +81,8 @@ def test_climb_hike_threshold_meaningfully_changes_grf92_finish_time() -> None:
 
 
 def test_descent_caution_changes_grf92_finish_time() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "grf92")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("grf92")
     loaded = load_course_trackpoints(course)
 
     lower_caution = calculate_plan(
@@ -117,8 +117,8 @@ def test_descent_caution_changes_grf92_finish_time() -> None:
 
 
 def test_segment_summaries_include_elevation_gain_and_loss() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
 
     result = calculate_plan(

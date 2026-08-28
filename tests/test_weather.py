@@ -6,8 +6,8 @@ from race_planners.planner import calculate_plan, load_course_trackpoints
 
 
 def test_heat_penalty_materially_slows_grf92_finish_time() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "grf92")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("grf92")
     loaded = load_course_trackpoints(course)
 
     cool = calculate_plan(
@@ -43,8 +43,8 @@ def test_heat_penalty_materially_slows_grf92_finish_time() -> None:
 
 
 def test_heat_curve_handles_multi_day_ultra_without_crash() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "grf166")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("grf166")
     loaded = load_course_trackpoints(course)
 
     result = calculate_plan(
@@ -67,8 +67,8 @@ def test_heat_curve_handles_multi_day_ultra_without_crash() -> None:
 
 
 def test_trail_heat_and_hill_tolerance_reduce_penalties() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "grf92")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("grf92")
     loaded = load_course_trackpoints(course)
 
     tolerant = calculate_plan(

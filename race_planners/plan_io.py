@@ -5,7 +5,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, cast
 
-from race_planners.event_catalog import get_curated_event_by_course_id
+from race_planners.event_catalog import CURATED_COURSES_DIR, get_curated_event_by_course_id
 from race_planners.models import PacingConfig
 
 PLAN_SCHEMA_VERSION = 1
@@ -38,28 +38,25 @@ def import_plan_json(plan_json: str) -> dict[str, Any]:
     return payload
 
 
-def ensure_gpx_exists_for_plan(plan_payload: dict[str, Any], gpx_search_roots: list[Path]) -> Path:
+def ensure_gpx_exists_for_plan(plan_payload: dict[str, Any]) -> Path:
     gpx_filename = str(plan_payload.get("gpx_filename", ""))
-    for root in gpx_search_roots:
-        candidate = root / gpx_filename
+    event = get_curated_event_by_course_id(str(plan_payload.get("course_id", "")))
+    if event is not None and event.gpx_relative_path.name == gpx_filename:
+        candidate = CURATED_COURSES_DIR / event.gpx_relative_path
         if candidate.exists():
             return candidate
     raise FileNotFoundError(
-        f"Missing course file: {gpx_filename}. Restore this course file in the repository to reload the saved plan."
+        f"Missing course file: {gpx_filename}. This plan requires a bundled curated course."
     )
 
 
 def load_plan_into_state(
     plan_json: str,
-    repo_root: Path,
     current_state: dict[str, Any],
 ) -> tuple[dict[str, Any], str | None]:
     try:
         payload = import_plan_json(plan_json)
-        ensure_gpx_exists_for_plan(
-            payload,
-            [repo_root / "semi-marathon-finistere", repo_root / "courses", repo_root],
-        )
+        ensure_gpx_exists_for_plan(payload)
     except (ValueError, FileNotFoundError) as exc:
         return current_state, str(exc)
 
@@ -68,7 +65,7 @@ def load_plan_into_state(
     updated_state["general_config"] = dict(payload["config"])
     if "athlete_profile" in payload:
         updated_state["general_athlete_profile"] = dict(payload["athlete_profile"])
-    matched_event = get_curated_event_by_course_id(repo_root, str(payload["course_id"]))
+    matched_event = get_curated_event_by_course_id(str(payload["course_id"]))
     if matched_event is not None:
         updated_state["general_event_id"] = matched_event.event_id
     return updated_state, None

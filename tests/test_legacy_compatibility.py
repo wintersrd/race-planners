@@ -14,8 +14,8 @@ from race_planners.planner import calculate_plan, load_course_trackpoints
 
 
 def test_finistere_half_marathon_plan_stability() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
 
     config = PacingConfig(

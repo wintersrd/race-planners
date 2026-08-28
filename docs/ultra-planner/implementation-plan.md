@@ -1,7 +1,7 @@
 # General Race Planner Implementation Plan
 
 Date: 2026-05-20
-Status: Approved for implementation
+Status: Historical implementation record. The GPX upload flow and local `courses/` library described here were later removed; courses are now curated, package-owned GPX files under `race_planners/data/courses/` (see `decisions-and-inputs.md`).
 
 ## Objective
 

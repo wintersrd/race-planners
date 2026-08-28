@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUTPUT_FILE="semi-marathon-finistere/requirements.txt"
+OUTPUT_FILE="race_planners/requirements.txt"
 
 cd "${ROOT_DIR}"
 

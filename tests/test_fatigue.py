@@ -15,8 +15,8 @@ def testfatigue_multiplier_progresses_by_model() -> None:
 
 
 def test_fade_profile_presets_change_trail_finish_time() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "grf92")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("grf92")
     loaded = load_course_trackpoints(course)
 
     stable = calculate_plan(
@@ -49,12 +49,12 @@ def test_fade_profile_presets_change_trail_finish_time() -> None:
 
 
 def test_trail_durability_factor_reduces_fade_cost() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    short_course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    short_course = get_course_by_id("semi-marathon-finistere")
     short_loaded = load_course_trackpoints(short_course)
-    long_course = get_course_by_id(repo_root, "grf92")
+    long_course = get_course_by_id("grf92")
     long_loaded = load_course_trackpoints(long_course)
-    very_long_course = get_course_by_id(repo_root, "grf166")
+    very_long_course = get_course_by_id("grf166")
     very_long_loaded = load_course_trackpoints(very_long_course)
 
     short_durable = calculate_plan(
