@@ -21,10 +21,10 @@ uv run pre-commit install
 Run Streamlit from repository root so path behavior matches Streamlit Community Cloud:
 
 ```bash
-uv run streamlit run semi-marathon-finistere/app.py
+uv run streamlit run race_planners/app.py
 ```
 
-Do not start the app with `uv run semi-marathon-finistere/app.py` as a normal Python script. This repository's app is a Streamlit entrypoint, not a plain CLI program.
+Do not start the app with `uv run race_planners/app.py` as a normal Python script. This repository's app is a Streamlit entrypoint, not a plain CLI program.
 
 If you do run the script directly, it now re-launches itself through Streamlit, but the supported command is still the `streamlit run` form above.
 
@@ -50,22 +50,20 @@ uv run pre-commit run --all-files
 
 ## Streamlit deployment dependencies
 
-`semi-marathon-finistere/requirements.txt` is generated from the `uv` project state.
+`race_planners/requirements.txt` is generated from the `uv` project state.
 
 ```bash
 scripts/export_streamlit_requirements.sh
 scripts/check_streamlit_requirements.sh
 ```
 
-Do not hand-edit `semi-marathon-finistere/requirements.txt`.
+Do not hand-edit `race_planners/requirements.txt`.
 
 ## Repository conventions for courses and plans
 
-- Local route library root: `courses/`
-- Plan files are JSON exports from the app and can reference repository-backed
-  GPX filenames
-- If a referenced curated GPX is missing on reload, restore the file in the
-  repository before retrying
+- Curated GPX assets are shipped in `race_planners/data/courses/`
+- Plan files are JSON exports from the app and reference curated GPX basenames
+- A plan can be reloaded only while its referenced curated course remains bundled
 
 ## Devcontainer
 

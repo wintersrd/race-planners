@@ -218,7 +218,7 @@ def render_general_planner(repo_root: Path) -> None:
     st.session_state.setdefault("general_event_id", "semi-marathon-finistere")
     st.session_state.setdefault("general_course_id", "semi-marathon-finistere")
 
-    events = list_curated_events(repo_root)
+    events = list_curated_events()
     if not events:
         st.error(t("app.no_events", locale))
         return
@@ -291,7 +291,6 @@ def render_general_planner(repo_root: Path) -> None:
             if loaded_plan is not None:
                 updated_state, load_error = load_plan_into_state(
                     loaded_plan.getvalue().decode("utf-8"),
-                    repo_root,
                     {str(key): st.session_state[key] for key in st.session_state.keys()},
                 )
                 if load_error is not None:
@@ -320,7 +319,7 @@ def render_general_planner(repo_root: Path) -> None:
             help=t("control.event.help", locale),
         )
 
-        selected_course = get_course_by_id(repo_root, selected_event.course_id)
+        selected_course = get_course_by_id(selected_event.course_id)
         if selected_event.event_id != previous_event_id:
             st.session_state["general_event_id"] = selected_event.event_id
             st.session_state["general_course_id"] = selected_event.course_id

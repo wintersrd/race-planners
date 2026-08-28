@@ -73,9 +73,8 @@ The package under `race_planners/` should become the canonical home for:
 - section generation
 - result shaping for UI rendering
 
-The monolithic logic in `semi-marathon-finistere/app.py` should be reduced over
-time to UI composition and compatibility glue, then eventually stop owning core
-planning logic.
+`race_planners/` owns the application entrypoint, UI composition, domain logic,
+and curated GPX assets; no legacy application shell remains.
 
 ### One canonical data contract
 
@@ -267,7 +266,7 @@ still throwing away the part users actually liked.
 
 ### Medium-term
 
-- move remaining planner logic out of `semi-marathon-finistere/app.py`
+- keep the package entrypoint and domain/UI boundaries under `race_planners/`
 - make the UI depend on the canonical package API
 - remove the planner-mode split when unified rendering is ready
 

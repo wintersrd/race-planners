@@ -6,8 +6,8 @@ from race_planners.planner import calculate_plan, load_course_trackpoints
 
 
 def test_calculate_plan_ignores_out_of_range_aid_stops() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    base = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    base = get_course_by_id("semi-marathon-finistere")
     course = Course(
         course_id=base.course_id,
         name=base.name,
@@ -26,8 +26,8 @@ def test_calculate_plan_ignores_out_of_range_aid_stops() -> None:
 
 
 def test_calculate_plan_supports_course_without_aid_stops() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    base = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    base = get_course_by_id("semi-marathon-finistere")
     course = Course(
         course_id=base.course_id,
         name=base.name,

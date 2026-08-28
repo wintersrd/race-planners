@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from race_planners.event_catalog import get_curated_event
 from race_planners.formatting import format_clock_time, format_duration_minutes, format_pace_minutes
 from race_planners.i18n import t
@@ -15,15 +13,15 @@ from race_planners.profile import (
 from race_planners.splits import aggregate_split_rows, course_overview_rows
 
 
-def test_load_plan_into_state_returns_user_facing_missing_gpx_error(tmp_path: Path) -> None:
+def test_load_plan_into_state_returns_user_facing_missing_gpx_error() -> None:
     payload_json = export_plan_json(
-        course_id="library:missing-course",
+        course_id="missing-course",
         gpx_filename="missing-course.gpx",
         config=PacingConfig(race_model="road_marathon", input_mode="finish_time"),
     )
 
     state, error = load_plan_into_state(
-        payload_json, tmp_path, {"general_config": {}, "general_course_id": "x"}
+        payload_json, {"general_config": {}, "general_course_id": "x"}
     )
 
     assert error is not None
@@ -31,14 +29,10 @@ def test_load_plan_into_state_returns_user_facing_missing_gpx_error(tmp_path: Pa
     assert state["general_course_id"] == "x"
 
 
-def test_load_plan_into_state_restores_course_and_config(tmp_path: Path) -> None:
-    course_dir = tmp_path / "semi-marathon-finistere"
-    course_dir.mkdir(parents=True)
-    (course_dir / "sample.gpx").write_text("<gpx></gpx>", encoding="utf-8")
-
+def test_load_plan_into_state_rejects_mismatched_curated_gpx() -> None:
     payload_json = export_plan_json(
         course_id="semi-marathon-finistere",
-        gpx_filename="sample.gpx",
+        gpx_filename="mismatched.gpx",
         config=PacingConfig(
             race_model="technical_trail_ultra",
             input_mode="effort_anchor",
@@ -48,19 +42,14 @@ def test_load_plan_into_state_restores_course_and_config(tmp_path: Path) -> None
     )
 
     state, error = load_plan_into_state(
-        payload_json, tmp_path, {"general_config": {}, "general_course_id": "x"}
+        payload_json, {"general_config": {}, "general_course_id": "x"}
     )
 
-    assert error is None
-    assert state["general_course_id"] == "semi-marathon-finistere"
-    assert state["general_config"]["race_model"] == "technical_trail_ultra"
+    assert error is not None
+    assert state["general_course_id"] == "x"
 
 
-def test_load_plan_into_state_restores_curated_event_id(tmp_path: Path) -> None:
-    course_dir = tmp_path / "semi-marathon-finistere"
-    course_dir.mkdir(parents=True)
-    (course_dir / "semi-marathon-du-finistere.gpx").write_text("<gpx></gpx>", encoding="utf-8")
-
+def test_load_plan_into_state_restores_curated_event_id() -> None:
     payload_json = export_plan_json(
         course_id="semi-marathon-finistere",
         gpx_filename="semi-marathon-du-finistere.gpx",
@@ -69,7 +58,6 @@ def test_load_plan_into_state_restores_curated_event_id(tmp_path: Path) -> None:
 
     state, error = load_plan_into_state(
         payload_json,
-        tmp_path,
         {"general_config": {}, "general_course_id": "x", "general_event_id": "y"},
     )
 
@@ -77,11 +65,7 @@ def test_load_plan_into_state_restores_curated_event_id(tmp_path: Path) -> None:
     assert state["general_event_id"] == "semi-marathon-finistere"
 
 
-def test_load_plan_into_state_restores_athlete_profile(tmp_path: Path) -> None:
-    course_dir = tmp_path / "semi-marathon-finistere"
-    course_dir.mkdir(parents=True)
-    (course_dir / "semi-marathon-du-finistere.gpx").write_text("<gpx></gpx>", encoding="utf-8")
-
+def test_load_plan_into_state_restores_athlete_profile() -> None:
     payload_json = export_plan_json(
         course_id="semi-marathon-finistere",
         gpx_filename="semi-marathon-du-finistere.gpx",
@@ -91,7 +75,6 @@ def test_load_plan_into_state_restores_athlete_profile(tmp_path: Path) -> None:
 
     state, error = load_plan_into_state(
         payload_json,
-        tmp_path,
         {"general_config": {}, "general_course_id": "x", "general_athlete_profile": {}},
     )
 
@@ -100,11 +83,7 @@ def test_load_plan_into_state_restores_athlete_profile(tmp_path: Path) -> None:
     assert state["general_athlete_profile"]["lt1_pace_min_km"] == 5.0
 
 
-def test_load_plan_into_state_restores_expanded_athlete_profile_fields(tmp_path: Path) -> None:
-    course_dir = tmp_path / "semi-marathon-finistere"
-    course_dir.mkdir(parents=True)
-    (course_dir / "semi-marathon-du-finistere.gpx").write_text("<gpx></gpx>", encoding="utf-8")
-
+def test_load_plan_into_state_restores_expanded_athlete_profile_fields() -> None:
     payload_json = export_plan_json(
         course_id="semi-marathon-finistere",
         gpx_filename="semi-marathon-du-finistere.gpx",
@@ -123,7 +102,6 @@ def test_load_plan_into_state_restores_expanded_athlete_profile_fields(tmp_path:
 
     state, error = load_plan_into_state(
         payload_json,
-        tmp_path,
         {"general_config": {}, "general_course_id": "x", "general_athlete_profile": {}},
     )
 
@@ -160,12 +138,8 @@ def test_athlete_profile_dataclass_round_trips_new_fields() -> None:
     assert profile.hill_tolerance == 0.2
 
 
-def testcourse_overview_rows_reflect_event_metadata(tmp_path: Path) -> None:
-    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
-    (tmp_path / "semi-marathon-finistere" / "semi-marathon-du-finistere.gpx").write_text(
-        "<gpx></gpx>", encoding="utf-8"
-    )
-    event = get_curated_event(tmp_path, "semi-marathon-finistere")
+def testcourse_overview_rows_reflect_event_metadata() -> None:
+    event = get_curated_event("semi-marathon-finistere")
 
     rows = course_overview_rows(21.06, event)
 
@@ -176,12 +150,8 @@ def testcourse_overview_rows_reflect_event_metadata(tmp_path: Path) -> None:
     assert all(row["label"] != "Race Model" for row in rows)
 
 
-def test_time_format_helpers_render_human_readable_values(tmp_path: Path) -> None:
-    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
-    (tmp_path / "semi-marathon-finistere" / "2026-grf92.gpx").write_text(
-        "<gpx></gpx>", encoding="utf-8"
-    )
-    event = get_curated_event(tmp_path, "grf92")
+def test_time_format_helpers_render_human_readable_values() -> None:
+    event = get_curated_event("grf92")
 
     assert format_pace_minutes(4.5) == "4:30"
     assert format_duration_minutes(88.5) == "1:28:30"
@@ -192,12 +162,8 @@ def test_time_format_helpers_render_human_readable_values(tmp_path: Path) -> Non
     assert format_clock_time(event, 0.0, "en") == "6:30 AM"
 
 
-def testaggregate_split_rows_supports_multi_kilometer_blocks(tmp_path: Path) -> None:
-    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
-    (tmp_path / "semi-marathon-finistere" / "2026-grf92.gpx").write_text(
-        "<gpx></gpx>", encoding="utf-8"
-    )
-    event = get_curated_event(tmp_path, "grf92")
+def testaggregate_split_rows_supports_multi_kilometer_blocks() -> None:
+    event = get_curated_event("grf92")
     rows = aggregate_split_rows(
         splits=[
             PaceSplit(1.0, 5.0, 2.0, 5.0, 5.0),
@@ -221,12 +187,8 @@ def testaggregate_split_rows_supports_multi_kilometer_blocks(tmp_path: Path) -> 
     assert rows[1][t("col.split_range")] == "2.0-3.0 km"
 
 
-def test_default_config_for_trail_event_uses_athlete_profile_defaults(tmp_path: Path) -> None:
-    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
-    (tmp_path / "semi-marathon-finistere" / "2026-grf92.gpx").write_text(
-        "<gpx></gpx>", encoding="utf-8"
-    )
-    event = get_curated_event(tmp_path, "grf92")
+def test_default_config_for_trail_event_uses_athlete_profile_defaults() -> None:
+    event = get_curated_event("grf92")
 
     config = default_config_for_event(
         event,
@@ -247,12 +209,8 @@ def test_default_config_for_trail_event_uses_athlete_profile_defaults(tmp_path: 
     assert config["hike_pace_min_km"] == 9.75
 
 
-def test_default_config_for_road_event_uses_profile_split_bias(tmp_path: Path) -> None:
-    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
-    (tmp_path / "semi-marathon-finistere" / "semi-marathon-du-finistere.gpx").write_text(
-        "<gpx></gpx>", encoding="utf-8"
-    )
-    event = get_curated_event(tmp_path, "semi-marathon-finistere")
+def test_default_config_for_road_event_uses_profile_split_bias() -> None:
+    event = get_curated_event("semi-marathon-finistere")
 
     config = default_config_for_event(
         event,
@@ -330,12 +288,8 @@ def testroad_capability_sources_marks_selected_source() -> None:
     assert sources[2]["selected"] is False
 
 
-def test_default_config_for_road_event_uses_selected_capability_time(tmp_path: Path) -> None:
-    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
-    (tmp_path / "semi-marathon-finistere" / "marathon-des-etoiles-de-la-baie.gpx").write_text(
-        "<gpx></gpx>", encoding="utf-8"
-    )
-    event = get_curated_event(tmp_path, "marathon-etoiles-baie")
+def test_default_config_for_road_event_uses_selected_capability_time() -> None:
+    event = get_curated_event("marathon-etoiles-baie")
 
     config = default_config_for_event(
         event,
@@ -349,14 +303,8 @@ def test_default_config_for_road_event_uses_selected_capability_time(tmp_path: P
     assert config["race_intent"] == "controlled"
 
 
-def test_default_config_for_road_event_uses_modeled_capability_when_no_override(
-    tmp_path: Path,
-) -> None:
-    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
-    (tmp_path / "semi-marathon-finistere" / "semi-marathon-du-finistere.gpx").write_text(
-        "<gpx></gpx>", encoding="utf-8"
-    )
-    event = get_curated_event(tmp_path, "semi-marathon-finistere")
+def test_default_config_for_road_event_uses_modeled_capability_when_no_override() -> None:
+    event = get_curated_event("semi-marathon-finistere")
 
     config = default_config_for_event(
         event,
@@ -371,12 +319,8 @@ def test_default_config_for_road_event_uses_modeled_capability_when_no_override(
     assert config["target_finish_time_min"] < 105.5
 
 
-def testcourse_overview_rows_include_known_start_time(tmp_path: Path) -> None:
-    (tmp_path / "semi-marathon-finistere").mkdir(parents=True)
-    (tmp_path / "semi-marathon-finistere" / "marathon-des-etoiles-de-la-baie.gpx").write_text(
-        "<gpx></gpx>", encoding="utf-8"
-    )
-    event = get_curated_event(tmp_path, "marathon-etoiles-baie")
+def testcourse_overview_rows_include_known_start_time() -> None:
+    event = get_curated_event("marathon-etoiles-baie")
 
     rows = course_overview_rows(42.06, event)
 

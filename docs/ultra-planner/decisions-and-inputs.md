@@ -12,17 +12,17 @@ Purpose: durable handoff context for continued implementation
 
 ## Course and route decisions
 
-- Built-in course library should be local files in the repository
-- GPX upload must also be supported for ad hoc routes
-- Saved JSON plans may reference local course/GPX files (no embedding required)
+- Built-in courses are curated, package-owned GPX files under `race_planners/data/courses/`
+- GPX upload and writable local course libraries are intentionally out of scope
+- Saved JSON plans reference curated GPX basenames (no embedding required)
 
 ### Missing GPX reload behavior
 
-If a saved plan references an uploaded GPX that is not present when reloading, planner should fail clearly and request re-upload before loading that plan.
+If a saved plan references a curated GPX that is not bundled when reloading, the planner should fail clearly.
 
 Preferred error style:
 
-`Missing course file: <filename>. Upload this GPX to restore the saved plan.`
+`Missing course file: <filename>. This plan requires a bundled curated course.`
 
 ## Input mode decisions
 

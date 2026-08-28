@@ -10,7 +10,7 @@ This file defines repository-level conventions for coding agents.
 
 ## Core commands
 
-- Run app: `uv run streamlit run semi-marathon-finistere/app.py`
+- Run app: `uv run streamlit run race_planners/app.py`
 - Lint: `uv run ruff check .`
 - Format: `uv run ruff format .`
 - Type-check: `uv run mypy tests`
@@ -18,7 +18,7 @@ This file defines repository-level conventions for coding agents.
 
 ## Streamlit deployment dependencies
 
-- `semi-marathon-finistere/requirements.txt` is generated, not hand-edited.
+- `race_planners/requirements.txt` is generated, not hand-edited.
 - Export command: `scripts/export_streamlit_requirements.sh`
 - Validation command: `scripts/check_streamlit_requirements.sh`
 

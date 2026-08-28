@@ -15,7 +15,7 @@ It is not just a split calculator. It combines:
 ## Launching the app
 
 ```bash
-uv run streamlit run semi-marathon-finistere/app.py
+uv run streamlit run race_planners/app.py
 ```
 
 The app opens in your browser at `http://localhost:8501`.

@@ -6,8 +6,8 @@ from race_planners.planner import calculate_plan, load_course_trackpoints
 
 
 def test_effort_policy_changes_grf92_finish_time() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "grf92")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("grf92")
     loaded = load_course_trackpoints(course)
 
     conservative = calculate_plan(
@@ -42,8 +42,8 @@ def test_effort_policy_changes_grf92_finish_time() -> None:
 
 
 def test_hr_guardrail_changes_grf92_finish_time() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "grf92")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("grf92")
     loaded = load_course_trackpoints(course)
 
     lower_cap = calculate_plan(
@@ -91,8 +91,8 @@ def test_hr_guardrail_changes_grf92_finish_time() -> None:
 
 
 def test_hr_guardrail_uses_profile_pace_relationships() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "grf92")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("grf92")
     loaded = load_course_trackpoints(course)
 
     lower_technical_tax = calculate_plan(

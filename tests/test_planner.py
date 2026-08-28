@@ -8,8 +8,8 @@ from race_planners.planner import calculate_plan, load_course_trackpoints
 
 
 def test_calculate_plan_for_marathon_pace_model() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
 
     config = PacingConfig(
@@ -29,8 +29,8 @@ def test_calculate_plan_for_marathon_pace_model() -> None:
 
 
 def test_fire_road_requires_all_effort_inputs() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
 
     config = PacingConfig(
@@ -44,8 +44,8 @@ def test_fire_road_requires_all_effort_inputs() -> None:
 
 
 def test_technical_trail_finish_time_mode_derives_effort_anchors() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
 
     config = PacingConfig(
@@ -62,8 +62,8 @@ def test_technical_trail_finish_time_mode_derives_effort_anchors() -> None:
 
 
 def test_fire_road_finish_time_mode_derives_effort_anchors() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
 
     config = PacingConfig(
@@ -79,8 +79,8 @@ def test_fire_road_finish_time_mode_derives_effort_anchors() -> None:
 
 
 def test_rest_stops_are_modeled_as_additive_timing() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
 
     config = PacingConfig(
@@ -103,8 +103,8 @@ def test_rest_stops_are_modeled_as_additive_timing() -> None:
 
 
 def test_pacing_bias_progressively_changes_total_time() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
 
     conservative = calculate_plan(

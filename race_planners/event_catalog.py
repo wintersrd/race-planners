@@ -5,6 +5,8 @@ from pathlib import Path
 from race_planners.models import CuratedEvent, EventTemplate
 
 
+CURATED_COURSES_DIR = Path(__file__).parent / "data" / "courses"
+
 _EVENT_TEMPLATES: tuple[EventTemplate, ...] = (
     EventTemplate(
         template_id="road_half",
@@ -58,7 +60,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             short_name="Finistere Half",
             template_id="road_half",
             course_id="semi-marathon-finistere",
-            gpx_relative_path=Path("semi-marathon-finistere/semi-marathon-du-finistere.gpx"),
+            gpx_relative_path=Path("semi-marathon-du-finistere.gpx"),
             race_model="half_marathon",
             terrain="road",
             aid_stops_km=[5.3, 9.1, 14.5],
@@ -72,7 +74,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             short_name="GRF56",
             template_id="trail_ultra",
             course_id="grf56",
-            gpx_relative_path=Path("semi-marathon-finistere/2026-grf56.gpx"),
+            gpx_relative_path=Path("2026-grf56.gpx"),
             race_model="technical_trail_ultra",
             terrain="trail",
             aid_stops_km=[16.9, 39.9, 47.4],
@@ -91,7 +93,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             short_name="GRF92",
             template_id="trail_ultra",
             course_id="grf92",
-            gpx_relative_path=Path("semi-marathon-finistere/2026-grf92.gpx"),
+            gpx_relative_path=Path("2026-grf92.gpx"),
             race_model="technical_trail_ultra",
             terrain="trail",
             aid_stops_km=[20.0, 37.1, 50.3, 70.7, 75.3, 83.1],
@@ -113,7 +115,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             short_name="GRF166",
             template_id="trail_ultra",
             course_id="grf166",
-            gpx_relative_path=Path("semi-marathon-finistere/2026-grf166.gpx"),
+            gpx_relative_path=Path("2026-grf166.gpx"),
             race_model="technical_trail_ultra",
             terrain="trail",
             aid_stops_km=[25.3, 38.5, 53.3, 75.0, 94.8, 111.9, 125.1, 145.4, 150.5, 158.0],
@@ -139,7 +141,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             short_name="Etoiles Marathon",
             template_id="road_marathon",
             course_id="marathon-etoiles-baie",
-            gpx_relative_path=Path("semi-marathon-finistere/marathon-des-etoiles-de-la-baie.gpx"),
+            gpx_relative_path=Path("marathon-des-etoiles-de-la-baie.gpx"),
             race_model="road_marathon",
             terrain="road",
             start_time_local="09:00",
@@ -152,7 +154,7 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
             short_name="Odet Ultra",
             template_id="trail_ultra",
             course_id="trail-odet-ultra",
-            gpx_relative_path=Path("semi-marathon-finistere/trail-de-l-odet-ultra.gpx"),
+            gpx_relative_path=Path("trail-de-l-odet-ultra.gpx"),
             race_model="technical_trail_ultra",
             terrain="trail",
             aid_stops_km=[18.0, 38.0, 45.0],
@@ -168,23 +170,23 @@ def _curated_event_definitions() -> tuple[CuratedEvent, ...]:
     )
 
 
-def list_curated_events(repo_root: Path) -> list[CuratedEvent]:
+def list_curated_events() -> list[CuratedEvent]:
     curated_events: list[CuratedEvent] = []
     for event in _curated_event_definitions():
-        if (repo_root / event.gpx_relative_path).exists():
+        if (CURATED_COURSES_DIR / event.gpx_relative_path).exists():
             curated_events.append(event)
     return curated_events
 
 
-def get_curated_event(repo_root: Path, event_id: str) -> CuratedEvent:
-    for event in list_curated_events(repo_root):
+def get_curated_event(event_id: str) -> CuratedEvent:
+    for event in list_curated_events():
         if event.event_id == event_id:
             return event
     raise ValueError(f"Unknown event id: {event_id}")
 
 
-def get_curated_event_by_course_id(repo_root: Path, course_id: str) -> CuratedEvent | None:
-    for event in list_curated_events(repo_root):
+def get_curated_event_by_course_id(course_id: str) -> CuratedEvent | None:
+    for event in list_curated_events():
         if event.course_id == course_id:
             return event
     return None

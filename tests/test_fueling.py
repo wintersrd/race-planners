@@ -53,8 +53,8 @@ def test_estimate_event_kcal_scales_with_distance() -> None:
 
 
 def test_fueling_plan_scales_carb_target_with_duration() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
     config = PacingConfig(
         race_model="half_marathon",
@@ -77,9 +77,9 @@ def test_fueling_plan_scales_carb_target_with_duration() -> None:
 
 
 def test_fueling_plan_produces_larger_carb_target_for_ultra() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
+    Path(__file__).resolve().parents[1]
 
-    half_course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    half_course = get_course_by_id("semi-marathon-finistere")
     half_loaded = load_course_trackpoints(half_course)
     half_result = calculate_plan(
         half_loaded,
@@ -90,7 +90,7 @@ def test_fueling_plan_produces_larger_carb_target_for_ultra() -> None:
         ),
     )
 
-    ultra_course = get_course_by_id(repo_root, "grf92")
+    ultra_course = get_course_by_id("grf92")
     ultra_loaded = load_course_trackpoints(ultra_course)
     ultra_result = calculate_plan(
         ultra_loaded,
@@ -110,8 +110,8 @@ def test_fueling_plan_produces_larger_carb_target_for_ultra() -> None:
 
 
 def test_aid_station_tier_affects_on_site_fuel() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
     config = PacingConfig(
         race_model="half_marathon",
@@ -139,8 +139,8 @@ def test_aid_station_tier_affects_on_site_fuel() -> None:
 
 
 def test_fueling_plan_warns_on_large_carb_deficit() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "grf92")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("grf92")
     loaded = load_course_trackpoints(course)
     config = PacingConfig(
         race_model="technical_trail_ultra",
@@ -157,8 +157,8 @@ def test_fueling_plan_warns_on_large_carb_deficit() -> None:
 
 
 def test_carry_items_use_realistic_gel_sizes() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
     config = PacingConfig(
         race_model="half_marathon",
@@ -176,8 +176,8 @@ def test_carry_items_use_realistic_gel_sizes() -> None:
 
 
 def test_fueling_window_skips_startup_and_tail_blocks() -> None:
-    repo_root = Path(__file__).resolve().parents[1]
-    course = get_course_by_id(repo_root, "semi-marathon-finistere")
+    Path(__file__).resolve().parents[1]
+    course = get_course_by_id("semi-marathon-finistere")
     loaded = load_course_trackpoints(course)
     config = PacingConfig(
         race_model="half_marathon",
